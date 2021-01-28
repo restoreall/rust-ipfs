@@ -34,6 +34,7 @@ pub mod refs;
 pub mod repo;
 mod subscription;
 pub mod unixfs;
+pub mod cli;
 
 #[macro_use]
 extern crate tracing;
