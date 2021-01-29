@@ -12,6 +12,9 @@ async fn main() {
     let (ipfs, fut): (Ipfs<TestTypes>, _) = UninitializedIpfs::new(opts).start().await.unwrap();
     task::spawn(fut);
 
+    let addrs = ipfs.identity().await.unwrap().1;
+    println!("I am listening on {:?}", addrs);
+
     let mut app = App::new("xCLI");
     app.add_subcommand_with_userdata(ipfs_cli_commands(), Box::new(ipfs));
 
