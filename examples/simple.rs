@@ -1,4 +1,4 @@
-use ipfs::{Ipfs, IpfsOptions, IpfsPath, TestTypes, UninitializedIpfs};
+use ipfs::{Ipfs, IpfsOptions, TestTypes, UninitializedIpfs};
 use tokio::task;
 use xcli::App;
 use ipfs::cli::ipfs_cli_commands;
