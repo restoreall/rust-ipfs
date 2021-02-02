@@ -21,7 +21,7 @@ fn cli_add(app: &App, args: &[&str]) -> XcliResult {
     let ipfs = handler(app);
 
     let mut adder = FileAdder::default();
-    let (_, n) = adder.push(args[0].as_bytes());
+    let _ = adder.push(args[0].as_bytes());
 
     executor::block_on(async {
         for (cid, data) in adder.finish() {

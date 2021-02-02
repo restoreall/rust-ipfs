@@ -2,6 +2,9 @@ mod cli_block;
 mod cli_dag;
 mod cli_swarm;
 mod cli_unixfs;
+mod cli_bitswap;
+mod cli_dht;
+mod cli_bootstrap;
 
 use crate::{Ipfs, TestTypes};
 use xcli::*;
@@ -17,6 +20,9 @@ pub fn ipfs_cli_commands<'a>() -> Command<'a> {
         .subcommand(cli_block::cli_block_commands())
         .subcommand(cli_dag::cli_dag_commands())
         .subcommand(cli_swarm::cli_swarm_commands())
+        .subcommand(cli_bitswap::cli_bitswap_commands())
+        .subcommand(cli_dht::cli_dht_commands())
+        .subcommand(cli_bootstrap::cli_bootstrap_commands())
 }
 
 pub(crate) fn handler(app: &App) -> Ipfs<TestTypes>
