@@ -1,9 +1,9 @@
-use cid::Cid;
 use crate::{cli::handler, Block};
+use cid::Cid;
 use futures::executor;
-use xcli::*;
-use std::convert::TryFrom;
 use multihash::Sha2_256;
+use std::convert::TryFrom;
+use xcli::*;
 
 pub(crate) fn cli_block_commands<'a>() -> Command<'a> {
     let get_block_cmd = Command::new_with_alias("get", "g")
@@ -21,7 +21,7 @@ pub(crate) fn cli_block_commands<'a>() -> Command<'a> {
 
     Command::new_with_alias("block", "b")
         .about("Interact with raw blocks in the datastore")
-        .usage("ipfs block - Interact with raw IPFS blocks.")
+        .usage("ipfs block")
         .subcommand(get_block_cmd)
         .subcommand(put_block_cmd)
         .subcommand(rm_block_cmd)

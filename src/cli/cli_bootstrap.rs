@@ -5,25 +5,25 @@ use std::str::FromStr;
 use xcli::*;
 
 pub(crate) fn cli_bootstrap_commands<'a>() -> Command<'a> {
-    let add_boot_cmd = Command::new_with_alias("add", "a")
+    let add_cmd = Command::new_with_alias("add", "a")
         .about("Add peers to the bootstrap list.")
         .usage("ipfs bootstrap add [<peer>]...")
         .action(cli_boot_add);
-    let list_boot_cmd = Command::new_with_alias("list", "l")
+    let list_cmd = Command::new_with_alias("list", "l")
         .about("Show peers in the bootstrap list.")
         .usage("ipfs bootstrap list")
         .action(cli_boot_list);
-    let rm_boot_cmd = Command::new_with_alias("rm", "r")
+    let rm_cmd = Command::new_with_alias("rm", "r")
         .about("Remove peers from the bootstrap list.")
         .usage("ipfs bootstrap rm [<peer>]...")
         .action(cli_boot_rm);
 
     Command::new_with_alias("bootstrap", "boot")
         .about("Add or remove bootstrap peers")
-        .usage("ipfs bootstrap - Show or edit the list of bootstrap peers.")
-        .subcommand(add_boot_cmd)
-        .subcommand(list_boot_cmd)
-        .subcommand(rm_boot_cmd)
+        .usage("ipfs bootstrap")
+        .subcommand(add_cmd)
+        .subcommand(list_cmd)
+        .subcommand(rm_cmd)
 }
 
 fn cli_boot_add(app: &App, args: &[&str]) -> XcliResult {

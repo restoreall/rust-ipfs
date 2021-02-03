@@ -1,8 +1,8 @@
 use crate::cli::handler;
-use futures::executor;
-use xcli::*;
 use crate::MultiaddrWithPeerId;
+use futures::executor;
 use std::str::FromStr;
+use xcli::*;
 
 pub(crate) fn cli_swarm_commands<'a>() -> Command<'a> {
     let connect_swarm_cmd = Command::new_with_alias("connect", "c")
@@ -26,8 +26,8 @@ pub(crate) fn cli_swarm_commands<'a>() -> Command<'a> {
         .action(cli_swarm_peers);
 
     Command::new_with_alias("swarm", "s")
-        .about("Interact with IPLD documents (experimental)")
-        .usage("ipfs dag - Interact with ipld dag objects.")
+        .about("Manage connections to the p2p network")
+        .usage("ipfs swarm")
         .subcommand(addrs_swarm_cmd)
         .subcommand(connect_swarm_cmd)
         .subcommand(disconnect_swarm_cmd)
@@ -40,7 +40,8 @@ fn cli_swarm_connect(app: &App, args: &[&str]) -> XcliResult {
     }
 
     let ipfs = handler(app);
-    let addr = MultiaddrWithPeerId::from_str(args[0]).map_err(|e| XcliError::BadArgument(e.to_string()))?;
+    let addr = MultiaddrWithPeerId::from_str(args[0])
+        .map_err(|e| XcliError::BadArgument(e.to_string()))?;
 
     executor::block_on(async {
         let r = ipfs.connect(addr).await;
@@ -56,7 +57,8 @@ fn cli_swarm_disconnect(app: &App, args: &[&str]) -> XcliResult {
     }
 
     let ipfs = handler(app);
-    let addr = MultiaddrWithPeerId::from_str(args[0]).map_err(|e| XcliError::BadArgument(e.to_string()))?;
+    let addr = MultiaddrWithPeerId::from_str(args[0])
+        .map_err(|e| XcliError::BadArgument(e.to_string()))?;
 
     executor::block_on(async {
         let r = ipfs.disconnect(addr).await;

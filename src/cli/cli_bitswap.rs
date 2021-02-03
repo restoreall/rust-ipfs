@@ -5,20 +5,20 @@ use std::str::FromStr;
 use xcli::*;
 
 pub(crate) fn cli_bitswap_commands<'a>() -> Command<'a> {
-    let wl_bs_cmd = Command::new_with_alias("wantlist", "w")
+    let wl_cmd = Command::new_with_alias("wantlist", "w")
         .about("Show blocks currently on the wantlist")
         .usage("ipfs bitswap wantlist")
         .action(cli_wl_bitswap);
-    let stat_bs_cmd = Command::new_with_alias("stat", "s")
+    let stat_cmd = Command::new_with_alias("stat", "s")
         .about("Show some diagnostic information on the bitswap agent")
         .usage("ipfs bitswap stat")
         .action(cli_stat_bitswap);
 
     Command::new_with_alias("bitswap", "bs")
         .about("exchange block with other peer")
-        .usage("ipfs bitswap - Interact with the bitswap agent.")
-        .subcommand(stat_bs_cmd)
-        .subcommand(wl_bs_cmd)
+        .usage("ipfs bitswap")
+        .subcommand(stat_cmd)
+        .subcommand(wl_cmd)
 }
 
 fn cli_wl_bitswap(app: &App, args: &[&str]) -> XcliResult {

@@ -1,8 +1,8 @@
-use cid::Cid;
 use crate::cli::handler;
+use cid::Cid;
 use futures::executor;
-use xcli::*;
 use std::convert::TryFrom;
+use xcli::*;
 
 pub(crate) fn cli_dag_commands<'a>() -> Command<'a> {
     let get_dag_cmd = Command::new_with_alias("get", "g")
@@ -16,7 +16,7 @@ pub(crate) fn cli_dag_commands<'a>() -> Command<'a> {
 
     Command::new_with_alias("dag", "d")
         .about("Interact with IPLD documents (experimental)")
-        .usage("ipfs dag - Interact with ipld dag objects.")
+        .usage("ipfs dag")
         .subcommand(get_dag_cmd)
         .subcommand(put_dag_cmd)
 }
