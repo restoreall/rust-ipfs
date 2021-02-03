@@ -18,6 +18,7 @@ pub fn ipfs_cli_commands<'a>() -> Command<'a> {
         .usage("ipfs")
         .subcommand(cli_unixfs::cli_add_commands())
         .subcommand(cli_unixfs::cli_cat_commands())
+        .subcommand(cli_unixfs::cli_get_commands())
         .subcommand(cli_block::cli_block_commands())
         .subcommand(cli_dag::cli_dag_commands())
         .subcommand(cli_swarm::cli_swarm_commands())

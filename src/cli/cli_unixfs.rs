@@ -1,10 +1,16 @@
 use crate::cli::handler;
+use crate::unixfs::ll::walk::{ContinuedWalk, Walker};
+use crate::Cid;
+use crate::{Block, IpfsPath};
 use futures::{executor, pin_mut, stream::StreamExt};
 use ipfs_unixfs::file::adder::FileAdder;
-use xcli::*;
 use std::convert::TryFrom;
-use crate::{IpfsPath, Block};
+use std::fs::{DirBuilder, OpenOptions};
+use std::io::Write;
+use std::path::PathBuf;
 use std::process::exit;
+use xcli::XcliError::BadArgument;
+use xcli::*;
 
 pub(crate) fn cli_add_commands<'a>() -> Command<'a> {
     Command::new_with_alias("add", "a")
@@ -71,7 +77,7 @@ fn cli_cat(app: &App, args: &[&str]) -> XcliResult {
                     println!("{:?}", bytes);
                 }
                 Some(Err(e)) => {
-                    eprintln!("Error: {}", e);
+                    eprintln!("Error: {:?}", e);
                     exit(1);
                 }
                 None => break,
@@ -90,33 +96,113 @@ pub(crate) fn cli_get_commands<'a>() -> Command<'a> {
 }
 
 fn cli_get(app: &App, args: &[&str]) -> XcliResult {
+    let mut cache = None;
+    let mut root = PathBuf::from("./");
+
+    // A symbol that means in the same tree.
+    let mut same_file = false;
+
     if args.len() < 1 {
         return Err(XcliError::MismatchArgument(1, args.len()));
     }
 
     let ipfs = handler(app);
-    let path = IpfsPath::try_from(args[0]).map_err(|e| XcliError::BadArgument(e.to_string()))?;
+
+    let cid = Cid::try_from(args[0]).map_err(|e| {
+        return BadArgument(e.to_string());
+    })?;
+
+    let mut walker = Walker::new(cid, "".to_string());
 
     executor::block_on(async {
-        let stream = ipfs.cat_unixfs(path, None).await.unwrap_or_else(|e| {
-            eprintln!("Error: {:?}", e);
-            exit(1);
-        });
+        while walker.should_continue() {
+            let (cid, _) = walker.pending_links();
 
-        // The stream needs to be pinned on the stack to be used with StreamExt::next
-        pin_mut!(stream);
+            let tmp_cid = cid.clone();
 
-        loop {
-            // This could be made more performant by polling the stream while writing to stdout.
-            match stream.next().await {
-                Some(Ok(bytes)) => {
-                    println!("{:?}", bytes);
-                }
-                Some(Err(e)) => {
-                    eprintln!("Error: {}", e);
+            let ipld_block = ipfs.get_block(cid).await.unwrap_or_else(|e| {
+                eprintln!("Error in get_block({:?}): {:?}", cid, e);
+                exit(1);
+            });
+
+            match walker
+                .next(&ipld_block.into_vec(), &mut cache)
+                .unwrap_or_else(|e| {
+                    eprintln!("Error in walker.next(): {:?}", e);
                     exit(1);
+                })
+            {
+                ContinuedWalk::Bucket(..) => {
+                    // Continuation of a HAMT shard directory that is usually ignored
                 }
-                None => break,
+                ContinuedWalk::File(segment, _, path, _, _) => {
+                    let mut file_name = PathBuf::new();
+
+                    if let Some("./") = root.to_str() {
+                        if let Some("") = path.clone().to_str() {
+                            root.push(multibase::Base::Base32Upper.encode(tmp_cid.to_bytes()));
+                            file_name = root.clone();
+                        }
+                    } else {
+                        file_name = root.clone();
+                        file_name.push(path);
+                    }
+
+                    // If true, means that it is the first block.
+                    if segment.is_first() {
+                        same_file = true;
+                        let _ = OpenOptions::new().write(true).append(true)
+                            .create(true).open(file_name.clone()).unwrap_or_else(|e| {
+                            eprintln!("Error in create file: {:?}", e);
+                            exit(1);
+                        });
+                    }
+
+                    // If true, it means file is larger than 256k and has been split
+                    if same_file {
+                        let mut file = OpenOptions::new().append(true).open(file_name.clone())
+                            .map_err(|e| {
+                                eprintln!("Error in open file: {:?}", e);
+                                exit(1);
+                            })
+                            .unwrap();
+
+                        file.write_all(segment.as_bytes()).unwrap_or_else(|e| {
+                            eprintln!("Error in write_all: {:?}", e);
+                            exit(1);
+                        });
+                    }
+
+                    if segment.is_last() {
+                        same_file = false;
+                        println!("filename: {:?}", file_name);
+                    }
+                }
+                ContinuedWalk::Directory(_, path, _metadata)
+                | ContinuedWalk::RootDirectory(_, path, _metadata) => {
+                    // Root directory
+                    if let Some("") = path.clone().to_str() {
+                        root.push(multibase::Base::Base32Upper.encode(tmp_cid.to_bytes()));
+                        DirBuilder::new().create(&root)
+                            .unwrap_or_else(|e| {
+                                eprintln!("Error in create dir by path empty: {:?}", e);
+                                exit(1);
+                            });
+                        println!("Directory: {:?}", &root)
+                    } else {
+                        // Other directory
+                        let mut root_tmp = root.clone();
+                        root_tmp.push(path);
+                        DirBuilder::new().create(&root_tmp)
+                            .unwrap_or_else(|e| {
+                                eprintln!("Error in create dir: {:?}", e);
+                                exit(1);
+                            });
+                        println!("Directory: {:?}", root_tmp)
+                    }
+                }
+                ContinuedWalk::Symlink(_, _, _, _) => {
+                }
             }
         }
     });

@@ -27,6 +27,7 @@ pub mod dag;
 pub mod error;
 #[macro_use]
 pub mod ipld;
+pub mod cli;
 pub mod ipns;
 pub mod p2p;
 pub mod path;
@@ -34,7 +35,6 @@ pub mod refs;
 pub mod repo;
 mod subscription;
 pub mod unixfs;
-pub mod cli;
 
 #[macro_use]
 extern crate tracing;
@@ -100,6 +100,7 @@ pub use libp2p::{
 
 /// Represents the configuration of the Ipfs node, its backing blockstore and datastore.
 pub trait IpfsTypes: RepoTypes {}
+
 impl<T: RepoTypes> IpfsTypes for T {}
 
 /// Default node configuration, currently with persistent block store and data store for pins.
@@ -195,6 +196,26 @@ impl IpfsOptions {
             kad_protocol: Some("/ipfs/lan/kad/1.0.0".to_owned()),
             listening_addrs: vec!["/ip4/127.0.0.1/tcp/0".parse().unwrap()],
             span: None,
+        }
+    }
+
+    // If IPFS_PATH is exists, use disk storage.
+    // Otherwise, use memory.
+    pub fn disk_with_generated_keys() -> Self {
+        match std::env::var("IPFS_PATH") {
+            Ok(path) => {
+                Self {
+                    ipfs_path: PathBuf::from(path),
+                    keypair: Keypair::generate_ed25519(),
+                    mdns: Default::default(),
+                    bootstrap: Default::default(),
+                    // default to lan kad for go-ipfs use in tests
+                    kad_protocol: Some("/ipfs/lan/kad/1.0.0".to_owned()),
+                    listening_addrs: vec!["/ip4/127.0.0.1/tcp/0".parse().unwrap()],
+                    span: None,
+                }
+            }
+            Err(_e) => IpfsOptions::inmemory_with_generated_keys(),
         }
     }
 }
