@@ -11,7 +11,7 @@ async fn main() {
 
     // Initialize the repo and start a daemon
     let opts = IpfsOptions::inmemory_with_generated_keys();
-    let (ipfs, fut): (Ipfs<TestTypes>, _) = UninitializedIpfs::new(opts).start().await.unwrap();
+    let (mut ipfs, fut): (Ipfs<TestTypes>, _) = UninitializedIpfs::new(opts).start().await.unwrap();
     task::spawn(fut);
 
     let addrs = ipfs.identity().await.unwrap().1;

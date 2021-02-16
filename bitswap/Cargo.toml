@@ -1,24 +1,30 @@
 [package]
-authors = ["Rust-IPFS contributors"]
-description = "Bitswap protocol implementation used in ipfs"
-edition = "2018"
-name = "ipfs-bitswap"
+name = "bitswap"
 version = "0.1.0"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/rs-ipfs/rust-ipfs"
+authors = ["macrocan <zhong_xiaohong@yeah.net>"]
+edition = "2018"
 
-[build-dependencies]
-prost-build = { default-features = false, version = "0.7" }
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+async-std = ["libp2p-rs/rt-async-std", "libp2p-rs/swarm-async-std"]
+#async-std = ["libp2prs-swarm/async-std", "libp2prs-runtime/async-std"]
+#tokio = ["libp2prs-swarm/tokio", "libp2prs-runtime/tokio"]
 
 [dependencies]
+async-trait = "0.1"
 cid = { default-features = false, version = "0.5" }
-fnv = { default-features = false, version = "1.0" }
-futures = { default-features = false, version = "0.3" }
-libp2p-core = { default-features = false, version = "0.27" }
-libp2p-swarm = { default-features = false, version = "0.27" }
+futures = { version = "0.3", features = ["std"], default-features = false }
 multihash = { default-features = false, version = "0.11" }
-prost = { default-features = false, version = "0.7" }
-thiserror = { default-features = false, version = "1.0" }
-tokio = { default-features = false, version = "1", features = ["rt"] }
-tracing = { default-features = false, version = "0.1" }
 unsigned-varint = { default-features = false, version = "0.3" }
+libp2p-rs = { git = "https://github.com/kingwel-xie/libp2p-rs.git", branch = "master", default-features = true, optional = false }
+log = "0.4"
+prost = { version = "0.7", features = ["std"], default-features = false }
+thiserror = "1.0"
+
+[build-dependencies]
+prost-build = "0.7"
+
+[dev-dependencies]
+env_logger = "0.8"
+#libp2p-rs = { git = "https://github.com/kingwel-xie/libp2p-rs.git", branch = "master", features = ["routed-async-std", "secio", "yamux"], default-features = false }

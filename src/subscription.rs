@@ -10,7 +10,7 @@ use core::hash::Hash;
 use core::pin::Pin;
 use futures::channel::mpsc::Sender;
 use futures::future::Future;
-use libp2p::kad::QueryId;
+use libp2p_rs::kad;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;

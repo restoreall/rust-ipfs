@@ -1,7 +1,5 @@
 use crate::cli::handler;
 use futures::executor;
-use libp2p::core::Multiaddr;
-use std::str::FromStr;
 use xcli::*;
 
 pub(crate) fn cli_listen_commands<'a>() -> Command<'a> {
@@ -22,47 +20,48 @@ pub(crate) fn cli_listen_commands<'a>() -> Command<'a> {
 }
 
 fn cli_listen_add(app: &App, args: &[&str]) -> XcliResult {
-    if args.len() < 1 {
-        return Err(XcliError::MismatchArgument(1, args.len()));
-    }
-
-    let ipfs = handler(app);
-    let mut addrs = vec![];
-    for arg in args {
-        let addr =
-            Multiaddr::from_str(arg.clone()).map_err(|e| XcliError::BadArgument(e.to_string()))?;
-        addrs.push(addr);
-    }
-
-    executor::block_on(async {
-        for addr in addrs {
-            let r = ipfs.add_listening_address(addr).await;
-            println!("added {:?}", r);
-        }
-    });
+    // if args.len() < 1 {
+    //     return Err(XcliError::MismatchArgument(1, args.len()));
+    // }
+    //
+    // let ipfs = handler(app);
+    // let mut addrs = vec![];
+    // for arg in args {
+    //     let addr =
+    //         Multiaddr::from_str(arg.clone()).map_err(|e| XcliError::BadArgument(e.to_string()))?;
+    //     addrs.push(addr);
+    // }
+    //
+    // executor::block_on(async {
+    //     for addr in addrs {
+    //         let r = ipfs.add_listening_address(addr).await;
+    //         println!("added {:?}", r);
+    //     }
+    // });
 
     Ok(CmdExeCode::Ok)
 }
 
 fn cli_listen_rm(app: &App, args: &[&str]) -> XcliResult {
-    if args.len() < 1 {
-        return Err(XcliError::MismatchArgument(1, args.len()));
-    }
-
-    let ipfs = handler(app);
-    let mut addrs = vec![];
-    for arg in args {
-        let addr =
-            Multiaddr::from_str(arg.clone()).map_err(|e| XcliError::BadArgument(e.to_string()))?;
-        addrs.push(addr);
-    }
-
-    executor::block_on(async {
-        for addr in addrs {
-            let r = ipfs.remove_listening_address(addr).await;
-            println!("removed {:?}", r);
-        }
-    });
+    // TODO: libp2p-rs doesn't support removing listener so far
+    // if args.len() < 1 {
+    //     return Err(XcliError::MismatchArgument(1, args.len()));
+    // }
+    //
+    // let ipfs = handler(app);
+    // let mut addrs = vec![];
+    // for arg in args {
+    //     let addr =
+    //         Multiaddr::from_str(arg.clone()).map_err(|e| XcliError::BadArgument(e.to_string()))?;
+    //     addrs.push(addr);
+    // }
+    //
+    // executor::block_on(async {
+    //     for addr in addrs {
+    //         let r = ipfs.remove_listening_address(addr).await;
+    //         println!("removed {:?}", r);
+    //     }
+    // });
 
     Ok(CmdExeCode::Ok)
 }

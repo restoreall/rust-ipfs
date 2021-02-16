@@ -3,7 +3,7 @@
 use crate::error::{Error, TryError};
 use cid::Cid;
 use core::convert::{TryFrom, TryInto};
-use libp2p::PeerId;
+use libp2p_rs::core::PeerId;
 use std::fmt;
 use std::str::FromStr;
 

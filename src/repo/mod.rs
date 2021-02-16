@@ -1,19 +1,16 @@
 //! Storage implementation(s) backing the [`crate::Ipfs`].
 use crate::error::Error;
-use crate::p2p::KadResult;
 use crate::path::IpfsPath;
-use crate::subscription::{RequestKind, SubscriptionFuture, SubscriptionRegistry};
 use crate::{Block, IpfsOptions};
 use async_trait::async_trait;
 use cid::{self, Cid};
-use core::convert::TryFrom;
 use core::fmt::Debug;
 use futures::channel::{
     mpsc::{channel, Receiver, Sender},
     oneshot,
 };
 use futures::sink::SinkExt;
-use libp2p::core::PeerId;
+use libp2p_rs::core::PeerId;
 use std::borrow::Borrow;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
@@ -328,7 +325,7 @@ pub struct Repo<TRepoTypes: RepoTypes> {
     block_store: TRepoTypes::TBlockStore,
     data_store: TRepoTypes::TDataStore,
     events: Sender<RepoEvent>,
-    pub(crate) subscriptions: SubscriptionRegistry<Block, String>,
+    //pub(crate) subscriptions: SubscriptionRegistry<Block, String>,
     lockfile: Arc<Mutex<TRepoTypes::TLock>>,
 }
 
@@ -336,18 +333,18 @@ pub struct Repo<TRepoTypes: RepoTypes> {
 #[derive(Debug)]
 pub enum RepoEvent {
     /// Signals a desired block.
-    WantBlock(Cid),
+    WantBlock(Cid, oneshot::Sender<Result<Block, anyhow::Error>>),
     /// Signals a desired block is no longer wanted.
     UnwantBlock(Cid),
     /// Signals the posession of a new block.
     NewBlock(
         Cid,
-        oneshot::Sender<Result<SubscriptionFuture<KadResult, String>, anyhow::Error>>,
+        oneshot::Sender<Result<(), anyhow::Error>>,
     ),
     /// Signals the removal of a block.
     RemovedBlock(Cid),
 }
-
+/*
 impl TryFrom<RequestKind> for RepoEvent {
     type Error = &'static str;
 
@@ -358,7 +355,7 @@ impl TryFrom<RequestKind> for RepoEvent {
             Err("logic error: RepoEvent can only be created from a Request::GetBlock")
         }
     }
-}
+}*/
 
 impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
     pub fn new(options: RepoOptions) -> (Self, Receiver<RepoEvent>) {
@@ -379,7 +376,6 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
                 block_store,
                 data_store,
                 events: sender,
-                subscriptions: Default::default(),
                 lockfile: Arc::new(Mutex::new(lockfile)),
             },
             receiver,
@@ -389,7 +385,8 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
     /// Shutdowns the repo, cancelling any pending subscriptions; Likely going away after some
     /// refactoring, see notes on [`crate::Ipfs::exit_daemon`].
     pub fn shutdown(&self) {
-        self.subscriptions.shutdown();
+        // TODO: shutdown all pending operations
+        //self.subscriptions.shutdown();
     }
 
     pub async fn init(&self) -> Result<(), Error> {
@@ -430,8 +427,6 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
         // bitswap housekeeping; we might want to not ignore the channel
         // errors when we actually start providing on the DHT
         if let BlockPut::NewBlock = res {
-            self.subscriptions
-                .finish_subscription(cid.clone().into(), Ok(block));
 
             // sending only fails if no one is listening anymore
             // and that is okay with us.
@@ -443,9 +438,10 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
                 .await
                 .ok();
 
-            if let Ok(Ok(kad_subscription)) = rx.await {
-                kad_subscription.await?;
-            }
+            // TODO: NewBlock
+            // if let Ok(Ok(kad_subscription)) = rx.await {
+            //     kad_subscription.await?;
+            // }
         }
 
         Ok((cid, res))
@@ -460,17 +456,14 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
         if let Some(block) = self.get_block_now(&cid).await? {
             Ok(block)
         } else {
-            let subscription = self
-                .subscriptions
-                .create_subscription(cid.clone().into(), Some(self.events.clone()));
-            // sending only fails if no one is listening anymore
-            // and that is okay with us.
+            // TODO: WantBlock
+            let (tx, rx) = oneshot::channel();
             self.events
                 .clone()
-                .send(RepoEvent::WantBlock(cid.clone()))
+                .send(RepoEvent::WantBlock(cid.to_owned(), tx))
                 .await
                 .ok();
-            Ok(subscription.await?)
+            rx.await?
         }
     }
 

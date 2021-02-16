@@ -8,7 +8,7 @@ use crate::Ipfs;
 mod dnslink;
 
 /// IPNS facade around [`Ipns`].
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Ipns<Types: RepoTypes> {
     ipfs: Ipfs<Types>,
 }

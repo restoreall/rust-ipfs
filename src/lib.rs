@@ -33,7 +33,7 @@ pub mod p2p;
 pub mod path;
 pub mod refs;
 pub mod repo;
-mod subscription;
+//mod subscription;
 pub mod unixfs;
 
 #[macro_use]
@@ -41,16 +41,12 @@ extern crate tracing;
 
 use anyhow::{anyhow, format_err};
 use cid::Codec;
-use either::Either;
 use futures::{
     channel::{
-        mpsc::{channel, Receiver, Sender},
-        oneshot::{channel as oneshot_channel, Sender as OneshotSender},
+        mpsc::{Receiver},
     },
-    sink::SinkExt,
     stream::{Fuse, Stream},
 };
-use libp2p::swarm::NetworkBehaviour;
 use tracing::Span;
 use tracing_futures::Instrument;
 
@@ -71,31 +67,30 @@ use self::{
     ipns::Ipns,
     p2p::{
         addr::{could_be_bound_from_ephemeral, starts_unspecified},
-        create_swarm, SwarmOptions, TSwarm,
+        create_controls, SwarmOptions,
     },
     repo::{create_repo, Repo, RepoEvent, RepoOptions},
-    subscription::SubscriptionFuture,
 };
 
 pub use self::{
     error::Error,
     ipld::Ipld,
     p2p::{
-        pubsub::{PubsubMessage, SubscriptionStream},
-        Connection, KadResult, MultiaddrWithPeerId, MultiaddrWithoutPeerId,
+        pubsub::PubsubMessage,
+        Connection, MultiaddrWithPeerId, MultiaddrWithoutPeerId,
     },
     path::IpfsPath,
     repo::{PinKind, PinMode, RepoTypes},
 };
 pub use cid::Cid;
-pub use ipfs_bitswap::Block;
-pub use libp2p::{
+pub use bitswap::Block;
+
+pub use libp2p_rs::{
     core::{
-        connection::ListenerId, multiaddr::multiaddr, multiaddr::Protocol, Multiaddr, PeerId,
-        PublicKey,
+        multiaddr::Protocol, Multiaddr, PeerId, PublicKey, identity::Keypair
+
     },
-    identity::Keypair,
-    kad::{record::Key, Quorum},
+    kad::record::Key,
 };
 
 /// Represents the configuration of the Ipfs node, its backing blockstore and datastore.
@@ -250,12 +245,11 @@ impl<I: Borrow<Keypair>> DebuggableKeypair<I> {
 /// endpoint implementations in `ipfs-http`.
 ///
 /// The facade is created through [`UninitializedIpfs`] which is configured with [`IpfsOptions`].
-#[derive(Debug)]
 pub struct Ipfs<Types: IpfsTypes> {
     span: Span,
     repo: Arc<Repo<Types>>,
     keys: DebuggableKeypair<Keypair>,
-    to_task: Sender<IpfsEvent>,
+    controls: Controls<Types>,
 }
 
 impl<Types: IpfsTypes> Clone for Ipfs<Types> {
@@ -264,73 +258,72 @@ impl<Types: IpfsTypes> Clone for Ipfs<Types> {
             span: self.span.clone(),
             repo: Arc::clone(&self.repo),
             keys: self.keys.clone(),
-            to_task: self.to_task.clone(),
+            controls: self.controls.clone(),
         }
     }
 }
 
-type Channel<T> = OneshotSender<Result<T, Error>>;
-
-/// Events used internally to communicate with the swarm, which is executed in the the background
-/// task.
-#[derive(Debug)]
-enum IpfsEvent {
-    /// Connect
-    Connect(
-        MultiaddrWithPeerId,
-        OneshotSender<Option<SubscriptionFuture<(), String>>>,
-    ),
-    /// Addresses
-    Addresses(Channel<Vec<(PeerId, Vec<Multiaddr>)>>),
-    /// Local addresses
-    Listeners(Channel<Vec<Multiaddr>>),
-    /// Connections
-    Connections(Channel<Vec<Connection>>),
-    /// Disconnect
-    Disconnect(MultiaddrWithPeerId, Channel<()>),
-    /// Request background task to return the listened and external addresses
-    GetAddresses(OneshotSender<Vec<Multiaddr>>),
-    PubsubSubscribe(String, OneshotSender<Option<SubscriptionStream>>),
-    PubsubUnsubscribe(String, OneshotSender<bool>),
-    PubsubPublish(String, Vec<u8>, OneshotSender<()>),
-    PubsubPeers(Option<String>, OneshotSender<Vec<PeerId>>),
-    PubsubSubscribed(OneshotSender<Vec<String>>),
-    WantList(
-        Option<PeerId>,
-        OneshotSender<Vec<(Cid, ipfs_bitswap::Priority)>>,
-    ),
-    BitswapStats(OneshotSender<BitswapStats>),
-    AddListeningAddress(Multiaddr, Channel<Multiaddr>),
-    RemoveListeningAddress(Multiaddr, Channel<()>),
-    Bootstrap(Channel<SubscriptionFuture<KadResult, String>>),
-    AddPeer(PeerId, Multiaddr),
-    GetClosestPeers(PeerId, OneshotSender<SubscriptionFuture<KadResult, String>>),
-    GetBitswapPeers(OneshotSender<Vec<PeerId>>),
-    FindPeer(
-        PeerId,
-        bool,
-        OneshotSender<Either<Vec<Multiaddr>, SubscriptionFuture<KadResult, String>>>,
-    ),
-    GetProviders(Cid, OneshotSender<SubscriptionFuture<KadResult, String>>),
-    Provide(Cid, Channel<SubscriptionFuture<KadResult, String>>),
-    DhtGet(
-        Key,
-        Quorum,
-        OneshotSender<SubscriptionFuture<KadResult, String>>,
-    ),
-    DhtPut(
-        Key,
-        Vec<u8>,
-        Quorum,
-        Channel<SubscriptionFuture<KadResult, String>>,
-    ),
-    GetBootstrappers(OneshotSender<Vec<Multiaddr>>),
-    AddBootstrapper(MultiaddrWithPeerId, Channel<Multiaddr>),
-    RemoveBootstrapper(MultiaddrWithPeerId, Channel<Multiaddr>),
-    ClearBootstrappers(OneshotSender<Vec<Multiaddr>>),
-    RestoreBootstrappers(Channel<Vec<Multiaddr>>),
-    Exit,
-}
+//
+// /// Events used internally to communicate with the swarm, which is executed in the the background
+// /// task.
+// #[derive(Debug)]
+// enum IpfsEvent {
+//     /// Connect
+//     Connect(
+//         MultiaddrWithPeerId,
+//         OneshotSender<Option<SubscriptionFuture<(), String>>>,
+//     ),
+//     /// Addresses
+//     Addresses(Channel<Vec<(PeerId, Vec<Multiaddr>)>>),
+//     /// Local addresses
+//     Listeners(Channel<Vec<Multiaddr>>),
+//     /// Connections
+//     Connections(Channel<Vec<Connection>>),
+//     /// Disconnect
+//     Disconnect(MultiaddrWithPeerId, Channel<()>),
+//     /// Request background task to return the listened and external addresses
+//     GetAddresses(OneshotSender<Vec<Multiaddr>>),
+//     PubsubSubscribe(String, OneshotSender<Option<SubscriptionStream>>),
+//     PubsubUnsubscribe(String, OneshotSender<bool>),
+//     PubsubPublish(String, Vec<u8>, OneshotSender<()>),
+//     PubsubPeers(Option<String>, OneshotSender<Vec<PeerId>>),
+//     PubsubSubscribed(OneshotSender<Vec<String>>),
+//     WantList(
+//         Option<PeerId>,
+//         OneshotSender<Vec<(Cid, bitswap::Priority)>>,
+//     ),
+//     BitswapStats(OneshotSender<BitswapStats>),
+//     AddListeningAddress(Multiaddr, Channel<Multiaddr>),
+//     RemoveListeningAddress(Multiaddr, Channel<()>),
+//     Bootstrap(Channel<SubscriptionFuture<KadResult, String>>),
+//     AddPeer(PeerId, Multiaddr),
+//     GetClosestPeers(PeerId, OneshotSender<SubscriptionFuture<KadResult, String>>),
+//     GetBitswapPeers(OneshotSender<Vec<PeerId>>),
+//     FindPeer(
+//         PeerId,
+//         bool,
+//         OneshotSender<Either<Vec<Multiaddr>, SubscriptionFuture<KadResult, String>>>,
+//     ),
+//     GetProviders(Cid, OneshotSender<SubscriptionFuture<KadResult, String>>),
+//     Provide(Cid, Channel<SubscriptionFuture<KadResult, String>>),
+//     DhtGet(
+//         Key,
+//         Quorum,
+//         OneshotSender<SubscriptionFuture<KadResult, String>>,
+//     ),
+//     DhtPut(
+//         Key,
+//         Vec<u8>,
+//         Quorum,
+//         Channel<SubscriptionFuture<KadResult, String>>,
+//     ),
+//     GetBootstrappers(OneshotSender<Vec<Multiaddr>>),
+//     AddBootstrapper(MultiaddrWithPeerId, Channel<Multiaddr>),
+//     RemoveBootstrapper(MultiaddrWithPeerId, Channel<Multiaddr>),
+//     ClearBootstrappers(OneshotSender<Vec<Multiaddr>>),
+//     RestoreBootstrappers(Channel<Vec<Multiaddr>>),
+//     Exit,
+// }
 
 /// Configured Ipfs which can only be started.
 pub struct UninitializedIpfs<Types: IpfsTypes> {
@@ -372,7 +365,7 @@ impl<Types: IpfsTypes> UninitializedIpfs<Types> {
         let UninitializedIpfs {
             repo,
             keys,
-            repo_events,
+            mut repo_events,
             mut options,
         } = self;
 
@@ -397,36 +390,72 @@ impl<Types: IpfsTypes> UninitializedIpfs<Types> {
 
         repo.init().instrument(init_span.clone()).await?;
 
-        let (to_task, receiver) = channel::<IpfsEvent>(1);
-
-        let ipfs = Ipfs {
-            span: facade_span,
-            repo: repo.clone(),
-            keys: DebuggableKeypair(keys),
-            to_task,
-        };
-
         // FIXME: mutating options above is an unfortunate side-effect of this call, which could be
         // reordered for less error prone code.
         let swarm_options = SwarmOptions::from(&options);
-        let swarm = create_swarm(swarm_options, exec_span, repo)
+        let mut controls = create_controls(swarm_options, exec_span, repo.clone())
             .instrument(tracing::trace_span!(parent: &init_span, "swarm"))
-            .await?;
+            .await;
 
         let IpfsOptions {
             listening_addrs, ..
         } = options;
 
-        let mut fut = IpfsFuture {
-            repo_events: repo_events.fuse(),
-            from_facade: receiver.fuse(),
-            swarm,
-            listening_addresses: HashMap::with_capacity(listening_addrs.len()),
+        let ipfs = Ipfs {
+            span: facade_span,
+            repo,
+            keys: DebuggableKeypair(keys),
+            controls: controls.clone(),
         };
 
-        for addr in listening_addrs.into_iter() {
-            fut.start_add_listener_address(addr, None);
-        }
+        // let mut fut = IpfsFuture {
+        //     repo_events: repo_events.fuse(),
+        //     controls: controls.clone(),
+        //     listening_addresses: HashMap::with_capacity(listening_addrs.len()),
+        // };
+
+        let mut bitswap = controls.bitswap().clone();
+
+        let fut = async move {
+            loop {
+                match repo_events.next().await {
+                    Some(evt) => {
+                        match evt {
+                            RepoEvent::WantBlock(cid, _reply) => {
+                                let b = bitswap.want_block(cid, 1).await;
+                            },
+                            RepoEvent::UnwantBlock(cid) => {
+                                //bitswap.cancel_block(&cid)
+                            },
+                            RepoEvent::NewBlock(cid, ret) => {
+                                // TODO: consider if cancel is applicable in cases where we provide the
+                                // associated Block ourselves
+                                //self.controls.bitswap().cancel_block(&cid);
+                                // currently disabled; see https://github.com/rs-ipfs/rust-ipfs/pull/281#discussion_r465583345
+                                // for details regarding the concerns about enabling this functionality as-is
+                                let _ = ret.send(Ok(()));
+                                // if false {
+                                //     let _ = ret.send(self.swarm.start_providing(cid));
+                                // } else {
+                                //     let _ = ret.send(Err(anyhow!("not actively providing blocks yet")));
+                                // }
+                            }
+                            RepoEvent::RemovedBlock(cid) => {
+                                //self.swarm.stop_providing_block(&cid)
+                            },
+                        }
+                    }
+                    None => {
+                        panic!("never gonna happen");
+                    }
+                }
+            }
+        };
+
+        // TODO:
+        // for addr in listening_addrs.into_iter() {
+        //     fut.start_add_listener_address(addr, None);
+        // }
 
         Ok((ipfs, fut.instrument(swarm_span)))
     }
@@ -679,347 +708,245 @@ impl<Types: IpfsTypes> Ipfs<Types> {
     ///
     /// Returns a future which will complete when the connection has been successfully made or
     /// failed for whatever reason.
-    pub async fn connect(&self, target: MultiaddrWithPeerId) -> Result<(), Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
-            self.to_task
-                .clone()
-                .send(IpfsEvent::Connect(target, tx))
-                .await?;
-            let subscription = rx.await?;
-
-            if let Some(future) = subscription {
-                future.await.map_err(|e| anyhow!(e))
-            } else {
-                futures::future::ready(Err(anyhow!("Duplicate connection attempt"))).await
-            }
-        }
-        .instrument(self.span.clone())
-        .await
+    pub async fn connect(&mut self, target: MultiaddrWithPeerId) -> Result<(), Error> {
+        self.controls.swarm().connect_with_addrs(target.peer_id, vec![target.multiaddr.into()])
+            .instrument(self.span.clone())
+            .await
+            .map_err(Error::from)
     }
 
     /// Returns known peer addresses
     pub async fn addrs(&self) -> Result<Vec<(PeerId, Vec<Multiaddr>)>, Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
-            self.to_task.clone().send(IpfsEvent::Addresses(tx)).await?;
-            rx.await?
-        }
-        .instrument(self.span.clone())
-        .await
+        Ok(self.controls.addrs())
     }
 
     /// Returns local listening addresses
-    pub async fn addrs_local(&self) -> Result<Vec<Multiaddr>, Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
-            self.to_task.clone().send(IpfsEvent::Listeners(tx)).await?;
-            rx.await?
-        }
-        .instrument(self.span.clone())
-        .await
+    pub async fn addrs_local(&mut self) -> Result<Vec<Multiaddr>, Error> {
+        self.controls.swarm().self_addrs()
+            .instrument(self.span.clone())
+            .await
+            .map_err(Error::from)
     }
 
-    /// Returns the connected peers
-    pub async fn peers(&self) -> Result<Vec<Connection>, Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
-            self.to_task
-                .clone()
-                .send(IpfsEvent::Connections(tx))
-                .await?;
-            rx.await?
-        }
-        .instrument(self.span.clone())
-        .await
+    /// Returns the connected peers - connections
+    pub async fn peers(&mut self) -> Result<Vec<Connection>, Error> {
+        let connections = self.controls.swarm().dump_connections(None)
+            .instrument(self.span.clone())
+            .await?;
+
+        // TODO: rtt
+        let cc = connections
+            .into_iter()
+            .map(|c| {
+                let addr = MultiaddrWithoutPeerId::try_from(c.info.ra)
+                            .expect("dialed address did not contain peerid in libp2p 0.34")
+                            .with(c.info.remote_peer_id);
+                Connection {
+                    addr,
+                    rtt: None
+                }
+            })
+            .collect();
+
+        Ok(cc)
     }
 
     /// Disconnects a given peer.
     ///
     /// At the moment the peer is disconnected by temporarily banning the peer and unbanning it
     /// right after. This should always disconnect all connections to the peer.
-    pub async fn disconnect(&self, target: MultiaddrWithPeerId) -> Result<(), Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
-            self.to_task
-                .clone()
-                .send(IpfsEvent::Disconnect(target, tx))
-                .await?;
-            rx.await?
-        }
-        .instrument(self.span.clone())
-        .await
+    pub async fn disconnect(&mut self, target: MultiaddrWithPeerId) -> Result<(), Error> {
+        self.controls.swarm().disconnect(target.peer_id)
+            .instrument(self.span.clone())
+            .await
+            .map_err(Error::from)
     }
 
     /// Returns the local node public key and the listened and externally visible addresses.
     /// The addresses are suffixed with the P2p protocol containing the node's PeerId.
     ///
     /// Public key can be converted to [`PeerId`].
-    pub async fn identity(&self) -> Result<(PublicKey, Vec<Multiaddr>), Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
-
-            self.to_task
-                .clone()
-                .send(IpfsEvent::GetAddresses(tx))
-                .await?;
-            let mut addresses = rx.await?;
-            let public_key = self.keys.get_ref().public();
-            let peer_id = public_key.clone().into_peer_id();
-
-            for addr in &mut addresses {
-                addr.push(Protocol::P2p(peer_id.clone().into()))
-            }
-
-            Ok((public_key, addresses))
-        }
-        .instrument(self.span.clone())
-        .await
+    pub async fn identity(&mut self) -> Result<(PublicKey, Vec<Multiaddr>), Error> {
+        let ii = self.controls.swarm().retrieve_identify_info()
+            .instrument(self.span.clone())
+            .await?;
+        Ok((ii.public_key, ii.listen_addrs))
     }
 
     /// Subscribes to a given topic. Can be done at most once without unsubscribing in the between.
     /// The subscription can be unsubscribed by dropping the stream or calling
     /// [`Ipfs::pubsub_unsubscribe`].
-    pub async fn pubsub_subscribe(&self, topic: String) -> Result<SubscriptionStream, Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
-
-            self.to_task
-                .clone()
-                .send(IpfsEvent::PubsubSubscribe(topic.clone(), tx))
-                .await?;
-
-            rx.await?
-                .ok_or_else(|| format_err!("already subscribed to {:?}", topic))
-        }
-        .instrument(self.span.clone())
-        .await
+    pub async fn pubsub_subscribe(&mut self, topic: String) -> Result<Subscription, Error> {
+        self.controls.pubsub().subscribe(Topic::new(topic))
+            .instrument(self.span.clone())
+            .await
+            .ok_or(anyhow!("subscribe failed"))
     }
 
     /// Publishes to the topic which may have been subscribed to earlier
-    pub async fn pubsub_publish(&self, topic: String, data: Vec<u8>) -> Result<(), Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
+    pub async fn pubsub_publish(&mut self, topic: String, data: Vec<u8>) -> Result<(), Error> {
+        self.controls.pubsub().publish(Topic::new(topic), data)
+            .instrument(self.span.clone())
+            .await;
 
-            self.to_task
-                .clone()
-                .send(IpfsEvent::PubsubPublish(topic, data, tx))
-                .await?;
-
-            Ok(rx.await?)
-        }
-        .instrument(self.span.clone())
-        .await
+        Ok(())
     }
 
-    /// Forcibly unsubscribes a previously made [`SubscriptionStream`], which could also be
-    /// unsubscribed by dropping the stream.
-    ///
-    /// Returns true if unsubscription was successful
-    pub async fn pubsub_unsubscribe(&self, topic: &str) -> Result<bool, Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
-
-            self.to_task
-                .clone()
-                .send(IpfsEvent::PubsubUnsubscribe(topic.into(), tx))
-                .await?;
-
-            Ok(rx.await?)
-        }
-        .instrument(self.span.clone())
-        .await
-    }
-
+    // /// Forcibly unsubscribes a previously made [`SubscriptionStream`], which could also be
+    // /// unsubscribed by dropping the stream.
+    // ///
+    // /// Returns true if unsubscription was successful
+    // pub async fn pubsub_unsubscribe(&self, topic: &str) -> Result<bool, Error> {
+    //     async move {
+    //         let (tx, rx) = oneshot_channel();
+    //
+    //         self.to_task
+    //             .clone()
+    //             .send(IpfsEvent::PubsubUnsubscribe(topic.into(), tx))
+    //             .await?;
+    //
+    //         Ok(rx.await?)
+    //     }
+    //     .instrument(self.span.clone())
+    //     .await
+    // }
+    //
     /// Returns all known pubsub peers with the optional topic filter
-    pub async fn pubsub_peers(&self, topic: Option<String>) -> Result<Vec<PeerId>, Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
+    pub async fn pubsub_peers(&mut self, topic: Option<String>) -> Result<Vec<PeerId>, Error> {
+        let topic = if let Some(t) = topic {
+            t
+        } else {
+            String::new()
+        };
 
-            self.to_task
-                .clone()
-                .send(IpfsEvent::PubsubPeers(topic, tx))
-                .await?;
+        let peers = self.controls.pubsub().get_peers(Topic::new(topic))
+            .instrument(self.span.clone())
+            .await;
 
-            Ok(rx.await?)
-        }
-        .instrument(self.span.clone())
-        .await
+        Ok(peers)
     }
 
     /// Returns all currently subscribed topics
-    pub async fn pubsub_subscribed(&self) -> Result<Vec<String>, Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
+    pub async fn pubsub_subscribed(&mut self) -> Result<Vec<String>, Error> {
+        let topics = self.controls.pubsub().ls()
+            .instrument(self.span.clone())
+            .await;
 
-            self.to_task
-                .clone()
-                .send(IpfsEvent::PubsubSubscribed(tx))
-                .await?;
+        let r = topics.into_iter().map(String::from).collect::<Vec<_>>();
 
-            Ok(rx.await?)
-        }
-        .instrument(self.span.clone())
-        .await
+        Ok(r)
     }
 
     /// Returns the known wantlist for the local node when the `peer` is `None` or the wantlist of the given `peer`
     pub async fn bitswap_wantlist(
-        &self,
+        &mut self,
         peer: Option<PeerId>,
-    ) -> Result<Vec<(Cid, ipfs_bitswap::Priority)>, Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
-
-            self.to_task
-                .clone()
-                .send(IpfsEvent::WantList(peer, tx))
-                .await?;
-
-            Ok(rx.await?)
-        }
-        .instrument(self.span.clone())
-        .await
+    ) -> Result<Vec<(Cid, bitswap::Priority)>, Error> {
+        self.controls.bitswap().wantlist()
+            .instrument(self.span.clone())
+            .await
+            .map_err(Error::from)
     }
 
-    /// Returns a list of local blocks
-    ///
-    /// This implementation is subject to change into a stream, which might only include the pinned
-    /// blocks.
-    pub async fn refs_local(&self) -> Result<Vec<Cid>, Error> {
-        self.repo.list_blocks().instrument(self.span.clone()).await
-    }
+    // /// Returns a list of local blocks
+    // ///
+    // /// This implementation is subject to change into a stream, which might only include the pinned
+    // /// blocks.
+    // pub async fn refs_local(&self) -> Result<Vec<Cid>, Error> {
+    //     self.repo.list_blocks().instrument(self.span.clone()).await
+    // }
+    //
+    // /// Returns the accumulated bitswap stats
+    // pub async fn bitswap_stats(&self) -> Result<BitswapStats, Error> {
+    //     async move {
+    //         let (tx, rx) = oneshot_channel();
+    //
+    //         self.to_task
+    //             .clone()
+    //             .send(IpfsEvent::BitswapStats(tx))
+    //             .await?;
+    //
+    //         Ok(rx.await?)
+    //     }
+    //     .instrument(self.span.clone())
+    //     .await
+    // }
 
-    /// Returns the accumulated bitswap stats
-    pub async fn bitswap_stats(&self) -> Result<BitswapStats, Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
-
-            self.to_task
-                .clone()
-                .send(IpfsEvent::BitswapStats(tx))
-                .await?;
-
-            Ok(rx.await?)
-        }
-        .instrument(self.span.clone())
-        .await
-    }
-
-    /// Add a given multiaddr as a listening address. Will fail if the address is unsupported, or
-    /// if it is already being listened on. Currently will invoke `Swarm::listen_on` internally,
-    /// keep the ListenerId for later `remove_listening_address` use in a HashMap.
-    ///
-    /// The returned future will resolve on the first bound listening address when this is called
-    /// with `/ip4/0.0.0.0/...` or anything similar which will bound through multiple concrete
-    /// listening addresses.
-    ///
-    /// Trying to add an unspecified listening address while any other listening address adding is
-    /// in progress will result in error.
-    ///
-    /// Returns the bound multiaddress, which in the case of original containing an ephemeral port
-    /// has now been changed.
-    pub async fn add_listening_address(&self, addr: Multiaddr) -> Result<Multiaddr, Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
-
-            self.to_task
-                .clone()
-                .send(IpfsEvent::AddListeningAddress(addr, tx))
-                .await?;
-
-            rx.await?
-        }
-        .instrument(self.span.clone())
-        .await
-    }
-
-    /// Stop listening on a previously added listening address. Fails if the address is not being
-    /// listened to.
-    ///
-    /// The removal of all listening addresses added through unspecified addresses is not supported.
-    pub async fn remove_listening_address(&self, addr: Multiaddr) -> Result<(), Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
-
-            self.to_task
-                .clone()
-                .send(IpfsEvent::RemoveListeningAddress(addr, tx))
-                .await?;
-
-            rx.await?
-        }
-        .instrument(self.span.clone())
-        .await
-    }
+    // /// Add a given multiaddr as a listening address. Will fail if the address is unsupported, or
+    // /// if it is already being listened on. Currently will invoke `Swarm::listen_on` internally,
+    // /// keep the ListenerId for later `remove_listening_address` use in a HashMap.
+    // ///
+    // /// The returned future will resolve on the first bound listening address when this is called
+    // /// with `/ip4/0.0.0.0/...` or anything similar which will bound through multiple concrete
+    // /// listening addresses.
+    // ///
+    // /// Trying to add an unspecified listening address while any other listening address adding is
+    // /// in progress will result in error.
+    // ///
+    // /// Returns the bound multiaddress, which in the case of original containing an ephemeral port
+    // /// has now been changed.
+    // pub async fn add_listening_address(&self, addr: Multiaddr) -> Result<Multiaddr, Error> {
+    //     async move {
+    //         let (tx, rx) = oneshot_channel();
+    //
+    //         self.to_task
+    //             .clone()
+    //             .send(IpfsEvent::AddListeningAddress(addr, tx))
+    //             .await?;
+    //
+    //         rx.await?
+    //     }
+    //     .instrument(self.span.clone())
+    //     .await
+    // }
+    //
+    // /// Stop listening on a previously added listening address. Fails if the address is not being
+    // /// listened to.
+    // ///
+    // /// The removal of all listening addresses added through unspecified addresses is not supported.
+    // pub async fn remove_listening_address(&self, addr: Multiaddr) -> Result<(), Error> {
+    //     async move {
+    //         let (tx, rx) = oneshot_channel();
+    //
+    //         self.to_task
+    //             .clone()
+    //             .send(IpfsEvent::RemoveListeningAddress(addr, tx))
+    //             .await?;
+    //
+    //         rx.await?
+    //     }
+    //     .instrument(self.span.clone())
+    //     .await
+    // }
 
     /// Obtain the addresses associated with the given `PeerId`; they are first searched for locally
     /// and the DHT is used as a fallback: a `Kademlia::get_closest_peers(peer_id)` query is run and
     /// when it's finished, the newly added DHT records are checked for the existence of the desired
     /// `peer_id` and if it's there, the list of its known addresses is returned.
-    pub async fn find_peer(&self, peer_id: PeerId) -> Result<Vec<Multiaddr>, Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
-
-            self.to_task
-                .clone()
-                .send(IpfsEvent::FindPeer(peer_id, false, tx))
-                .await?;
-
-            match rx.await? {
-                Either::Left(addrs) if !addrs.is_empty() => Ok(addrs),
-                Either::Left(_) => unreachable!(),
-                Either::Right(future) => {
-                    future.await?;
-
-                    let (tx, rx) = oneshot_channel();
-
-                    self.to_task
-                        .clone()
-                        .send(IpfsEvent::FindPeer(peer_id, true, tx))
-                        .await?;
-
-                    match rx.await? {
-                        Either::Left(addrs) if !addrs.is_empty() => Ok(addrs),
-                        _ => Err(anyhow!("couldn't find peer {}", peer_id)),
-                    }
-                }
-            }
-        }
-        .instrument(self.span.clone())
-        .await
+    pub async fn find_peer(&mut self, peer_id: PeerId) -> Result<Vec<Multiaddr>, Error> {
+        self.controls.kad().find_peer(&peer_id)
+            .instrument(self.span.clone())
+            .await
+            .map(|kad_peer| kad_peer.multiaddrs)
+            .map_err(Error::from)
     }
 
     /// Performs a DHT lookup for providers of a value to the given key.
     ///
     /// Returns a list of peers found providing the Cid.
-    pub async fn get_providers(&self, cid: Cid) -> Result<Vec<PeerId>, Error> {
-        let kad_result = async move {
-            let (tx, rx) = oneshot_channel();
-
-            self.to_task
-                .clone()
-                .send(IpfsEvent::GetProviders(cid, tx))
-                .await?;
-
-            Ok(rx.await?).map_err(|e: String| anyhow!(e))
-        }
-        .instrument(self.span.clone())
-        .await?
-        .await;
-
-        match kad_result {
-            Ok(KadResult::Peers(providers)) => Ok(providers),
-            Ok(_) => unreachable!(),
-            Err(e) => Err(anyhow!(e)),
-        }
+    pub async fn get_providers(&mut self, cid: Cid) -> Result<Vec<PeerId>, Error> {
+        self.controls.kad().find_providers(cid.to_bytes(), 1)
+            .instrument(self.span.clone())
+            .await
+            .map(|peers| peers.into_iter().map(|p|p.node_id).collect())
+            .ok_or(anyhow!("Provider Not Found"))
     }
 
     /// Establishes the node as a provider of a block with the given Cid: it publishes a provider
     /// record with the given key (Cid) and the node's PeerId to the peers closest to the key. The
     /// publication of provider records is periodically repeated as per the interval specified in
     /// `libp2p`'s  `KademliaConfig`.
-    pub async fn provide(&self, cid: Cid) -> Result<(), Error> {
+    pub async fn provide(&mut self, cid: Cid) -> Result<(), Error> {
         // don't provide things we don't actually have
         if self.repo.get_block_now(&cid).await?.is_none() {
             return Err(anyhow!(
@@ -1028,111 +955,48 @@ impl<Types: IpfsTypes> Ipfs<Types> {
             ));
         }
 
-        let kad_result = async move {
-            let (tx, rx) = oneshot_channel();
-
-            self.to_task
-                .clone()
-                .send(IpfsEvent::Provide(cid, tx))
-                .await?;
-
-            rx.await?
-        }
-        .instrument(self.span.clone())
-        .await?
-        .await;
-
-        match kad_result {
-            Ok(KadResult::Complete) => Ok(()),
-            Ok(_) => unreachable!(),
-            Err(e) => Err(anyhow!(e)),
-        }
+        self.controls.kad().provide(cid.to_bytes())
+            .instrument(self.span.clone())
+            .await
+            .map_err(Error::from)
     }
 
     /// Returns a list of peers closest to the given `PeerId`, as suggested by the DHT. The
     /// node must have at least one known peer in its routing table in order for the query
     /// to return any values.
-    pub async fn get_closest_peers(&self, peer_id: PeerId) -> Result<Vec<PeerId>, Error> {
-        let kad_result = async move {
-            let (tx, rx) = oneshot_channel();
-
-            self.to_task
-                .clone()
-                .send(IpfsEvent::GetClosestPeers(peer_id, tx))
-                .await?;
-
-            Ok(rx.await?).map_err(|e: String| anyhow!(e))
-        }
-        .instrument(self.span.clone())
-        .await?
-        .await;
-
-        match kad_result {
-            Ok(KadResult::Peers(closest)) => Ok(closest),
-            Ok(_) => unreachable!(),
-            Err(e) => Err(anyhow!(e)),
-        }
+    pub async fn get_closest_peers(&mut self, peer_id: PeerId) -> Result<Vec<PeerId>, Error> {
+        self.controls.kad().lookup(peer_id.to_bytes().into())
+            .instrument(self.span.clone())
+            .await
+            .map(|peers| peers.into_iter().map(|p|p.node_id).collect())
+            .map_err(Error::from)
     }
 
     /// Attempts to look a key up in the DHT and returns the values found in the records
     /// containing that key.
+    // TODO: libp2p-rs only returns the first record...
     pub async fn dht_get<T: Into<Key>>(
-        &self,
+        &mut self,
         key: T,
-        quorum: Quorum,
-    ) -> Result<Vec<Vec<u8>>, Error> {
-        let kad_result = async move {
-            let (tx, rx) = oneshot_channel();
-
-            self.to_task
-                .clone()
-                .send(IpfsEvent::DhtGet(key.into(), quorum, tx))
-                .await?;
-
-            Ok(rx.await?).map_err(|e: String| anyhow!(e))
-        }
-        .instrument(self.span.clone())
-        .await?
-        .await;
-
-        match kad_result {
-            Ok(KadResult::Records(recs)) => {
-                let values = recs.into_iter().map(|rec| rec.value).collect();
-                Ok(values)
-            }
-            Ok(_) => unreachable!(),
-            Err(e) => Err(anyhow!(e)),
-        }
+    ) -> Result<Vec<u8>, Error> {
+        self.controls.kad().get_value(key.into().to_vec())
+            .instrument(self.span.clone())
+            .await
+            .map_err(Error::from)
     }
 
     /// Stores the given key + value record locally and replicates it in the DHT. It doesn't
     /// expire locally and is periodically replicated in the DHT, as per the `KademliaConfig`
     /// setup.
     pub async fn dht_put<T: Into<Key>>(
-        &self,
+        &mut self,
         key: T,
         value: Vec<u8>,
-        quorum: Quorum,
     ) -> Result<(), Error> {
-        let kad_result = async move {
-            let (tx, rx) = oneshot_channel();
-
-            self.to_task
-                .clone()
-                .send(IpfsEvent::DhtPut(key.into(), value, quorum, tx))
-                .await?;
-
-            Ok(rx.await?).map_err(|e: String| anyhow!(e))
-        }
-        .instrument(self.span.clone())
-        .await??
-        .await;
-
-        match kad_result {
-            Ok(KadResult::Complete) => Ok(()),
-            Ok(_) => unreachable!(),
-            Err(e) => Err(anyhow!(e)),
-        }
+        self.controls.kad().put_value(key.into().to_vec(), value)
+            .instrument(self.span.clone())
+            .await
+            .map_err(Error::from)
     }
 
     /// Walk the given Iplds' links up to `max_depth` (or indefinitely for `None`). Will return
@@ -1151,466 +1015,15 @@ impl<Types: IpfsTypes> Ipfs<Types> {
         refs::iplds_refs(self, iplds, max_depth, unique)
     }
 
-    /// Obtain the list of addresses of bootstrapper nodes that are currently used.
-    pub async fn get_bootstrappers(&self) -> Result<Vec<Multiaddr>, Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
-
-            self.to_task
-                .clone()
-                .send(IpfsEvent::GetBootstrappers(tx))
-                .await?;
-
-            Ok(rx.await?)
-        }
-        .instrument(self.span.clone())
-        .await
-    }
-
-    /// Extend the list of used bootstrapper nodes with an additional address.
-    /// Return value cannot be used to determine if the `addr` was a new bootstrapper, subject to
-    /// change.
-    pub async fn add_bootstrapper(&self, addr: MultiaddrWithPeerId) -> Result<Multiaddr, Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
-
-            self.to_task
-                .clone()
-                .send(IpfsEvent::AddBootstrapper(addr, tx))
-                .await?;
-
-            rx.await?
-        }
-        .instrument(self.span.clone())
-        .await
-    }
-
-    /// Remove an address from the currently used list of bootstrapper nodes.
-    /// Return value cannot be used to determine if the `addr` was an actual bootstrapper, subject to
-    /// change.
-    pub async fn remove_bootstrapper(&self, addr: MultiaddrWithPeerId) -> Result<Multiaddr, Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
-
-            self.to_task
-                .clone()
-                .send(IpfsEvent::RemoveBootstrapper(addr, tx))
-                .await?;
-
-            rx.await?
-        }
-        .instrument(self.span.clone())
-        .await
-    }
-
-    /// Clear the currently used list of bootstrapper nodes, returning the removed addresses.
-    pub async fn clear_bootstrappers(&self) -> Result<Vec<Multiaddr>, Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
-
-            self.to_task
-                .clone()
-                .send(IpfsEvent::ClearBootstrappers(tx))
-                .await?;
-
-            Ok(rx.await?)
-        }
-        .instrument(self.span.clone())
-        .await
-    }
-
-    /// Restore the originally configured bootstrapper node list by adding them to the list of the
-    /// currently used bootstrapper node address list; returns the restored addresses.
-    pub async fn restore_bootstrappers(&self) -> Result<Vec<Multiaddr>, Error> {
-        async move {
-            let (tx, rx) = oneshot_channel();
-
-            self.to_task
-                .clone()
-                .send(IpfsEvent::RestoreBootstrappers(tx))
-                .await?;
-
-            rx.await?
-        }
-        .instrument(self.span.clone())
-        .await
-    }
-
     /// Exit daemon.
     pub async fn exit_daemon(mut self) {
         // FIXME: this is a stopgap measure needed while repo is part of the struct Ipfs instead of
         // the background task or stream. After that this could be handled by dropping.
         self.repo.shutdown();
 
-        // ignoring the error because it'd mean that the background task had already been dropped
-        let _ = self.to_task.try_send(IpfsEvent::Exit);
-    }
-}
-
-/// Background task of `Ipfs` created when calling `UninitializedIpfs::start`.
-// The receivers are Fuse'd so that we don't have to manage state on them being exhausted.
-struct IpfsFuture<Types: IpfsTypes> {
-    swarm: TSwarm<Types>,
-    repo_events: Fuse<Receiver<RepoEvent>>,
-    from_facade: Fuse<Receiver<IpfsEvent>>,
-    listening_addresses: HashMap<Multiaddr, (ListenerId, Option<Channel<Multiaddr>>)>,
-}
-
-impl<TRepoTypes: RepoTypes> IpfsFuture<TRepoTypes> {
-    /// Completes the adding of listening address by matching the new listening address `addr` to
-    /// the `self.listening_addresses` so that we can detect even the multiaddresses with ephemeral
-    /// ports.
-    fn complete_listening_address_adding(&mut self, addr: Multiaddr) {
-        let maybe_sender = match self.listening_addresses.get_mut(&addr) {
-            // matching a non-ephemeral is simpler
-            Some((_, maybe_sender)) => maybe_sender.take(),
-            None => {
-                // try finding an ephemeral binding on the same prefix
-                let mut matching_keys = self
-                    .listening_addresses
-                    .keys()
-                    .filter(|right| could_be_bound_from_ephemeral(0, &addr, right))
-                    .cloned();
-
-                let first = matching_keys.next();
-
-                if let Some(first) = first {
-                    let second = matching_keys.next();
-
-                    match (first, second) {
-                        (first, None) => {
-                            if let Some((id, maybe_sender)) =
-                                self.listening_addresses.remove(&first)
-                            {
-                                self.listening_addresses.insert(addr.clone(), (id, None));
-                                maybe_sender
-                            } else {
-                                unreachable!("We found a matching ephemeral key already, it must be in the listening_addresses")
-                            }
-                        }
-                        (first, Some(second)) => {
-                            // this is more complicated, but we are guarding
-                            // against this in the from_facade match below
-                            unreachable!(
-                                "More than one matching [{}, {}] and {:?} for {}",
-                                first,
-                                second,
-                                matching_keys.collect::<Vec<_>>(),
-                                addr
-                            );
-                        }
-                    }
-                } else {
-                    // this case is hit when user asks for /ip4/0.0.0.0/tcp/0 for example, the
-                    // libp2p will bound to multiple addresses but we will not get access in 0.19
-                    // to their ListenerIds.
-
-                    let first = self
-                        .listening_addresses
-                        .iter()
-                        .filter(|(addr, _)| starts_unspecified(addr))
-                        .filter(|(could_have_ephemeral, _)| {
-                            could_be_bound_from_ephemeral(1, &addr, could_have_ephemeral)
-                        })
-                        // finally we want to make sure we only match on addresses which are yet to
-                        // be reported back
-                        .filter(|(_, (_, maybe_sender))| maybe_sender.is_some())
-                        .map(|(addr, _)| addr.to_owned())
-                        .next();
-
-                    if let Some(first) = first {
-                        let (id, maybe_sender) = self
-                            .listening_addresses
-                            .remove(&first)
-                            .expect("just filtered this key out");
-                        self.listening_addresses.insert(addr.clone(), (id, None));
-                        trace!("guessing the first match for {} to be {}", first, addr);
-                        maybe_sender
-                    } else {
-                        None
-                    }
-                }
-            }
-        };
-
-        if let Some(sender) = maybe_sender {
-            let _ = sender.send(Ok(addr));
-        }
-    }
-
-    fn start_add_listener_address(&mut self, addr: Multiaddr, ret: Option<Channel<Multiaddr>>) {
-        use libp2p::Swarm;
-        use std::collections::hash_map::Entry;
-
-        if starts_unspecified(&addr)
-            && self
-                .listening_addresses
-                .values()
-                .filter(|(_, maybe_sender)| maybe_sender.is_some())
-                .count()
-                > 0
-        {
-            if let Some(sender) = ret {
-                let _ = sender.send(Err(format_err!("Cannot start listening to an unspecified address when there are pending specified addresses")));
-            }
-            return;
-        }
-
-        match self.listening_addresses.entry(addr) {
-            Entry::Occupied(oe) => {
-                if let Some(sender) = ret {
-                    let _ = sender.send(Err(format_err!("Already adding a possibly ephemeral Multiaddr; wait for the first one to resolve before adding others: {}", oe.key())));
-                }
-            }
-            Entry::Vacant(ve) => match Swarm::listen_on(&mut self.swarm, ve.key().to_owned()) {
-                Ok(id) => {
-                    ve.insert((id, ret));
-                }
-                Err(e) => {
-                    if let Some(sender) = ret {
-                        let _ = sender.send(Err(Error::from(e)));
-                    }
-                }
-            },
-        }
-    }
-}
-
-impl<TRepoTypes: RepoTypes> Future for IpfsFuture<TRepoTypes> {
-    type Output = ();
-
-    fn poll(mut self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Self::Output> {
-        use libp2p::{swarm::SwarmEvent, Swarm};
-
-        // begin by polling the swarm so that initially it'll first have chance to bind listeners
-        // and such.
-
-        let mut done = false;
-
-        loop {
-            loop {
-                let inner = {
-                    let next = self.swarm.next_event();
-                    futures::pin_mut!(next);
-                    match next.poll(ctx) {
-                        Poll::Ready(inner) => inner,
-                        Poll::Pending if done => return Poll::Pending,
-                        Poll::Pending => break,
-                    }
-                };
-                // as a swarm event was returned, we need to do at least one more round to fully
-                // exhaust the swarm before possibly causing the swarm to do more work by popping
-                // off the events from Ipfs and ... this looping goes on for a while.
-                done = false;
-                match inner {
-                    SwarmEvent::NewListenAddr(addr) => {
-                        self.complete_listening_address_adding(addr);
-                    }
-                    _ => trace!("{:?}", inner),
-                }
-            }
-
-            // temporary pinning of the receivers should be safe as we are pinning through the
-            // already pinned self. with the receivers we can also safely ignore exhaustion
-            // as those are fused.
-            loop {
-                let inner = match Pin::new(&mut self.from_facade).poll_next(ctx) {
-                    Poll::Ready(Some(evt)) => evt,
-                    // doing teardown also after the `Ipfs` has been dropped
-                    Poll::Ready(None) => IpfsEvent::Exit,
-                    Poll::Pending => break,
-                };
-
-                match inner {
-                    IpfsEvent::Connect(target, ret) => {
-                        ret.send(self.swarm.connect(target)).ok();
-                    }
-                    IpfsEvent::Addresses(ret) => {
-                        let addrs = self.swarm.addrs();
-                        ret.send(Ok(addrs)).ok();
-                    }
-                    IpfsEvent::Listeners(ret) => {
-                        let listeners = Swarm::listeners(&self.swarm)
-                            .cloned()
-                            .collect::<Vec<Multiaddr>>();
-                        ret.send(Ok(listeners)).ok();
-                    }
-                    IpfsEvent::Connections(ret) => {
-                        let connections = self.swarm.connections();
-                        ret.send(Ok(connections.collect())).ok();
-                    }
-                    IpfsEvent::Disconnect(addr, ret) => {
-                        if let Some(disconnector) = self.swarm.disconnect(addr) {
-                            disconnector.disconnect(&mut self.swarm);
-                        }
-                        ret.send(Ok(())).ok();
-                    }
-                    IpfsEvent::GetAddresses(ret) => {
-                        // perhaps this could be moved under `IpfsEvent` or free functions?
-                        let mut addresses = Vec::new();
-                        addresses.extend(Swarm::listeners(&self.swarm).cloned());
-                        addresses.extend(
-                            Swarm::external_addresses(&self.swarm).map(|ar| ar.addr.clone()),
-                        );
-                        // ignore error, perhaps caller went away already
-                        let _ = ret.send(addresses);
-                    }
-                    IpfsEvent::PubsubSubscribe(topic, ret) => {
-                        let _ = ret.send(self.swarm.pubsub().subscribe(topic));
-                    }
-                    IpfsEvent::PubsubUnsubscribe(topic, ret) => {
-                        let _ = ret.send(self.swarm.pubsub().unsubscribe(topic));
-                    }
-                    IpfsEvent::PubsubPublish(topic, data, ret) => {
-                        self.swarm.pubsub().publish(topic, data);
-                        let _ = ret.send(());
-                    }
-                    IpfsEvent::PubsubPeers(Some(topic), ret) => {
-                        let topic = libp2p::floodsub::Topic::new(topic);
-                        let _ = ret.send(self.swarm.pubsub().subscribed_peers(&topic));
-                    }
-                    IpfsEvent::PubsubPeers(None, ret) => {
-                        let _ = ret.send(self.swarm.pubsub().known_peers());
-                    }
-                    IpfsEvent::PubsubSubscribed(ret) => {
-                        let _ = ret.send(self.swarm.pubsub().subscribed_topics());
-                    }
-                    IpfsEvent::WantList(peer, ret) => {
-                        let list = if let Some(peer) = peer {
-                            self.swarm
-                                .bitswap()
-                                .peer_wantlist(&peer)
-                                .unwrap_or_default()
-                        } else {
-                            self.swarm.bitswap().local_wantlist()
-                        };
-                        let _ = ret.send(list);
-                    }
-                    IpfsEvent::BitswapStats(ret) => {
-                        let stats = self.swarm.bitswap().stats();
-                        let peers = self.swarm.bitswap().peers();
-                        let wantlist = self.swarm.bitswap().local_wantlist();
-                        let _ = ret.send((stats, peers, wantlist).into());
-                    }
-                    IpfsEvent::AddListeningAddress(addr, ret) => {
-                        self.start_add_listener_address(addr, Some(ret));
-                    }
-                    IpfsEvent::RemoveListeningAddress(addr, ret) => {
-                        let removed = if let Some((id, _)) = self.listening_addresses.remove(&addr)
-                        {
-                            Swarm::remove_listener(&mut self.swarm, id).map_err(|_: ()| {
-                                format_err!(
-                                    "Failed to remove previously added listening address: {}",
-                                    addr
-                                )
-                            })
-                        } else {
-                            Err(format_err!("Address was not listened to before: {}", addr))
-                        };
-
-                        let _ = ret.send(removed);
-                    }
-                    IpfsEvent::Bootstrap(ret) => {
-                        let future = self.swarm.bootstrap();
-                        let _ = ret.send(future);
-                    }
-                    IpfsEvent::AddPeer(peer_id, addr) => {
-                        self.swarm.add_peer(peer_id, addr);
-                    }
-                    IpfsEvent::GetClosestPeers(peer_id, ret) => {
-                        let future = self.swarm.get_closest_peers(peer_id);
-                        let _ = ret.send(future);
-                    }
-                    IpfsEvent::GetBitswapPeers(ret) => {
-                        let peers = self
-                            .swarm
-                            .bitswap()
-                            .connected_peers
-                            .keys()
-                            .cloned()
-                            .collect();
-                        let _ = ret.send(peers);
-                    }
-                    IpfsEvent::FindPeer(peer_id, local_only, ret) => {
-                        let swarm_addrs = self.swarm.swarm.addresses_of_peer(&peer_id);
-                        let locally_known_addrs = if !swarm_addrs.is_empty() {
-                            swarm_addrs
-                        } else {
-                            self.swarm.kademlia().addresses_of_peer(&peer_id)
-                        };
-                        let addrs = if !locally_known_addrs.is_empty() || local_only {
-                            Either::Left(locally_known_addrs)
-                        } else {
-                            Either::Right(self.swarm.get_closest_peers(peer_id))
-                        };
-                        let _ = ret.send(addrs);
-                    }
-                    IpfsEvent::GetProviders(cid, ret) => {
-                        let future = self.swarm.get_providers(cid);
-                        let _ = ret.send(future);
-                    }
-                    IpfsEvent::Provide(cid, ret) => {
-                        let _ = ret.send(self.swarm.start_providing(cid));
-                    }
-                    IpfsEvent::DhtGet(key, quorum, ret) => {
-                        let future = self.swarm.dht_get(key, quorum);
-                        let _ = ret.send(future);
-                    }
-                    IpfsEvent::DhtPut(key, value, quorum, ret) => {
-                        let future = self.swarm.dht_put(key, value, quorum);
-                        let _ = ret.send(future);
-                    }
-                    IpfsEvent::GetBootstrappers(ret) => {
-                        let list = self.swarm.get_bootstrappers();
-                        let _ = ret.send(list);
-                    }
-                    IpfsEvent::AddBootstrapper(addr, ret) => {
-                        let result = self.swarm.add_bootstrapper(addr);
-                        let _ = ret.send(result);
-                    }
-                    IpfsEvent::RemoveBootstrapper(addr, ret) => {
-                        let result = self.swarm.remove_bootstrapper(addr);
-                        let _ = ret.send(result);
-                    }
-                    IpfsEvent::ClearBootstrappers(ret) => {
-                        let list = self.swarm.clear_bootstrappers();
-                        let _ = ret.send(list);
-                    }
-                    IpfsEvent::RestoreBootstrappers(ret) => {
-                        let list = self.swarm.restore_bootstrappers();
-                        let _ = ret.send(list);
-                    }
-                    IpfsEvent::Exit => {
-                        // FIXME: we could do a proper teardown
-                        return Poll::Ready(());
-                    }
-                }
-            }
-
-            // Poll::Ready(None) and Poll::Pending can be used to break out of the loop, clippy
-            // wants this to be written with a `while let`.
-            while let Poll::Ready(Some(evt)) = Pin::new(&mut self.repo_events).poll_next(ctx) {
-                match evt {
-                    RepoEvent::WantBlock(cid) => self.swarm.want_block(cid),
-                    RepoEvent::UnwantBlock(cid) => self.swarm.bitswap().cancel_block(&cid),
-                    RepoEvent::NewBlock(cid, ret) => {
-                        // TODO: consider if cancel is applicable in cases where we provide the
-                        // associated Block ourselves
-                        self.swarm.bitswap().cancel_block(&cid);
-                        // currently disabled; see https://github.com/rs-ipfs/rust-ipfs/pull/281#discussion_r465583345
-                        // for details regarding the concerns about enabling this functionality as-is
-                        if false {
-                            let _ = ret.send(self.swarm.start_providing(cid));
-                        } else {
-                            let _ = ret.send(Err(anyhow!("not actively providing blocks yet")));
-                        }
-                    }
-                    RepoEvent::RemovedBlock(cid) => self.swarm.stop_providing_block(&cid),
-                }
-            }
-
-            done = true;
-        }
+        self.controls.kad().close().await;
+        self.controls.swarm().close().await;
+        // TODO: close pubsub mdns...
     }
 }
 
@@ -1632,21 +1045,21 @@ pub struct BitswapStats {
     /// The current peers
     pub peers: Vec<PeerId>,
     /// The wantlist of the local node
-    pub wantlist: Vec<(Cid, ipfs_bitswap::Priority)>,
+    pub wantlist: Vec<(Cid, bitswap::Priority)>,
 }
 
 impl
     From<(
-        ipfs_bitswap::Stats,
+        bitswap::Stats,
         Vec<PeerId>,
-        Vec<(Cid, ipfs_bitswap::Priority)>,
+        Vec<(Cid, bitswap::Priority)>,
     )> for BitswapStats
 {
     fn from(
         (stats, peers, wantlist): (
-            ipfs_bitswap::Stats,
+            bitswap::Stats,
             Vec<PeerId>,
-            Vec<(Cid, ipfs_bitswap::Priority)>,
+            Vec<(Cid, bitswap::Priority)>,
         ),
     ) -> Self {
         BitswapStats {
@@ -1664,6 +1077,10 @@ impl
 
 #[doc(hidden)]
 pub use node::Node;
+use crate::p2p::Controls;
+use std::convert::TryFrom;
+use libp2p_rs::floodsub::Topic;
+use libp2p_rs::floodsub::subscription::Subscription;
 
 /// Node module provides an easy to use interface used in `tests/`.
 mod node {
@@ -1696,7 +1113,7 @@ mod node {
         }
 
         /// Connects to a peer at the given address.
-        pub async fn connect(&self, addr: Multiaddr) -> Result<(), Error> {
+        pub async fn connect(&mut self, addr: Multiaddr) -> Result<(), Error> {
             let addr = MultiaddrWithPeerId::try_from(addr).unwrap();
             self.ipfs.connect(addr).await
         }
@@ -1708,7 +1125,7 @@ mod node {
             // for future: assume UninitializedIpfs handles instrumenting any futures with the
             // given span
 
-            let (ipfs, fut): (Ipfs<TestTypes>, _) =
+            let (mut ipfs, fut): (Ipfs<TestTypes>, _) =
                 UninitializedIpfs::new(opts).start().await.unwrap();
             let bg_task = tokio::task::spawn(fut);
             let addrs = ipfs.identity().await.unwrap().1;
@@ -1721,53 +1138,47 @@ mod node {
             }
         }
 
-        /// Returns the subscriptions for a `Node`.
-        pub fn get_subscriptions(
-            &self,
-        ) -> &std::sync::Mutex<subscription::Subscriptions<Block, String>> {
-            &self.ipfs.repo.subscriptions.subscriptions
-        }
+        // /// Returns the subscriptions for a `Node`.
+        // pub fn get_subscriptions(
+        //     &self,
+        // ) -> &std::sync::Mutex<subscription::Subscriptions<Block, String>> {
+        //     &self.ipfs.repo.subscriptions.subscriptions
+        // }
 
         /// Bootstraps the local node to join the DHT: it looks up the node's own ID in the
         /// DHT and introduces it to the other nodes in it; at least one other node must be
         /// known in order for the process to succeed. Subsequently, additional queries are
         /// ran with random keys so that the buckets farther from the closest neighbor also
         /// get refreshed.
-        pub async fn bootstrap(&self) -> Result<KadResult, Error> {
-            let (tx, rx) = oneshot_channel();
-
-            self.to_task.clone().send(IpfsEvent::Bootstrap(tx)).await?;
-
-            rx.await??.await.map_err(|e| anyhow!(e))
-        }
-
-        /// Add a known listen address of a peer participating in the DHT to the routing table.
-        /// This is mandatory in order for the peer to be discoverable by other members of the
-        /// DHT.
-        pub async fn add_peer(&self, peer_id: PeerId, mut addr: Multiaddr) -> Result<(), Error> {
-            // Kademlia::add_address requires the address to not contain the PeerId
-            if matches!(addr.iter().last(), Some(Protocol::P2p(_))) {
-                addr.pop();
-            }
-
-            self.to_task
-                .clone()
-                .send(IpfsEvent::AddPeer(peer_id, addr))
-                .await?;
-
+        pub async fn bootstrap(&mut self) -> Result<(), Error> {
+            self.controls.kad().bootstrap().await;
             Ok(())
         }
 
+        // /// Add a known listen address of a peer participating in the DHT to the routing table.
+        // /// This is mandatory in order for the peer to be discoverable by other members of the
+        // /// DHT.
+        // pub async fn add_peer(&self, peer_id: PeerId, mut addr: Multiaddr) -> Result<(), Error> {
+        //     // Kademlia::add_address requires the address to not contain the PeerId
+        //     if matches!(addr.iter().last(), Some(Protocol::P2p(_))) {
+        //         addr.pop();
+        //     }
+        //
+        //     self.ipfs.add_node(peer_id, vec![addr])
+        //
+        // }
+
         /// Returns the Bitswap peers for the a `Node`.
         pub async fn get_bitswap_peers(&self) -> Result<Vec<PeerId>, Error> {
-            let (tx, rx) = oneshot_channel();
-
-            self.to_task
-                .clone()
-                .send(IpfsEvent::GetBitswapPeers(tx))
-                .await?;
-
-            rx.await.map_err(|e| anyhow!(e))
+            // let (tx, rx) = oneshot_channel();
+            //
+            // self.to_task
+            //     .clone()
+            //     .send(IpfsEvent::GetBitswapPeers(tx))
+            //     .await?;
+            //
+            // rx.await.map_err(|e| anyhow!(e))
+            Err(anyhow!("e"))
         }
 
         /// Shuts down the `Node`.

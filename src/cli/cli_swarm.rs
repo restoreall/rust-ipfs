@@ -39,7 +39,7 @@ fn cli_swarm_connect(app: &App, args: &[&str]) -> XcliResult {
         return Err(XcliError::MismatchArgument(1, args.len()));
     }
 
-    let ipfs = handler(app);
+    let mut ipfs = handler(app);
     let addr = MultiaddrWithPeerId::from_str(args[0])
         .map_err(|e| XcliError::BadArgument(e.to_string()))?;
 
@@ -56,7 +56,7 @@ fn cli_swarm_disconnect(app: &App, args: &[&str]) -> XcliResult {
         return Err(XcliError::MismatchArgument(1, args.len()));
     }
 
-    let ipfs = handler(app);
+    let mut ipfs = handler(app);
     let addr = MultiaddrWithPeerId::from_str(args[0])
         .map_err(|e| XcliError::BadArgument(e.to_string()))?;
 
@@ -69,7 +69,7 @@ fn cli_swarm_disconnect(app: &App, args: &[&str]) -> XcliResult {
 }
 
 fn cli_swarm_addrs(app: &App, _args: &[&str]) -> XcliResult {
-    let ipfs = handler(app);
+    let mut ipfs = handler(app);
     executor::block_on(async {
         let r = ipfs.addrs().await;
         if let Ok(addrs) = r {
@@ -81,7 +81,7 @@ fn cli_swarm_addrs(app: &App, _args: &[&str]) -> XcliResult {
 }
 
 fn cli_swarm_peers(app: &App, _args: &[&str]) -> XcliResult {
-    let ipfs = handler(app);
+    let mut ipfs = handler(app);
     executor::block_on(async {
         let r = ipfs.peers().await;
         if let Ok(peers) = r {

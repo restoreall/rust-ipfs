@@ -3,12 +3,10 @@ use crate::block::Block;
 use crate::error::BitswapError;
 use crate::prefix::Prefix;
 use cid::Cid;
-use core::convert::TryFrom;
 use prost::Message as ProstMessage;
-use std::{
-    collections::{HashMap, HashSet},
-    mem,
-};
+use std::collections::{HashMap, HashSet};
+use std::convert::TryFrom;
+use std::mem;
 
 pub type Priority = i32;
 
@@ -72,7 +70,7 @@ pub struct Message {
     want: HashMap<Cid, Priority>,
     /// List of blocks to cancel.
     cancel: HashSet<Cid>,
-    /// Wheather it is the full list of wanted blocks.
+    /// Whether it is the full list of wanted blocks.
     full: bool,
     /// List of blocks to send.
     pub(crate) blocks: Vec<Block>,
@@ -148,7 +146,7 @@ impl Into<Vec<u8>> for &Message {
         }
         for block in self.blocks() {
             let payload = bitswap_pb::message::Block {
-                prefix: Prefix::from(block.cid()).to_bytes(),
+                prefix: Prefix::from(&block.cid).to_bytes(),
                 data: block.data().to_vec(),
             };
             proto.payload.push(payload);

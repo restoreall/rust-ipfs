@@ -27,61 +27,61 @@ pub(crate) fn cli_bootstrap_commands<'a>() -> Command<'a> {
 }
 
 fn cli_boot_add(app: &App, args: &[&str]) -> XcliResult {
-    if args.len() < 1 {
-        return Err(XcliError::MismatchArgument(1, args.len()));
-    }
-
-    let ipfs = handler(app);
-    let mut addrs = vec![];
-    for arg in args {
-        let addr = MultiaddrWithPeerId::from_str(arg.clone())
-            .map_err(|e| XcliError::BadArgument(e.to_string()))?;
-        addrs.push(addr);
-    }
-
-    executor::block_on(async {
-        for addr in addrs {
-            let r = ipfs.add_bootstrapper(addr).await;
-            println!("added {:?}", r);
-        }
-    });
+    // if args.len() < 1 {
+    //     return Err(XcliError::MismatchArgument(1, args.len()));
+    // }
+    //
+    // let ipfs = handler(app);
+    // let mut addrs = vec![];
+    // for arg in args {
+    //     let addr = MultiaddrWithPeerId::from_str(arg.clone())
+    //         .map_err(|e| XcliError::BadArgument(e.to_string()))?;
+    //     addrs.push(addr);
+    // }
+    //
+    // executor::block_on(async {
+    //     for addr in addrs {
+    //         let r = ipfs.add_bootstrapper(addr).await;
+    //         println!("added {:?}", r);
+    //     }
+    // });
 
     Ok(CmdExeCode::Ok)
 }
 
 fn cli_boot_list(app: &App, _args: &[&str]) -> XcliResult {
-    let ipfs = handler(app);
-
-    executor::block_on(async {
-        ipfs.get_bootstrappers()
-            .await
-            .map_or(println!("none"), |addrs| {
-                addrs.iter().for_each(|a| println!("{:?}", a))
-            });
-    });
+    // let ipfs = handler(app);
+    //
+    // executor::block_on(async {
+    //     ipfs.get_bootstrappers()
+    //         .await
+    //         .map_or(println!("none"), |addrs| {
+    //             addrs.iter().for_each(|a| println!("{:?}", a))
+    //         });
+    // });
 
     Ok(CmdExeCode::Ok)
 }
 
 fn cli_boot_rm(app: &App, args: &[&str]) -> XcliResult {
-    if args.len() < 1 {
-        return Err(XcliError::MismatchArgument(1, args.len()));
-    }
-
-    let ipfs = handler(app);
-    let mut addrs = vec![];
-    for arg in args {
-        let addr = MultiaddrWithPeerId::from_str(arg.clone())
-            .map_err(|e| XcliError::BadArgument(e.to_string()))?;
-        addrs.push(addr);
-    }
-
-    executor::block_on(async {
-        for addr in addrs {
-            let r = ipfs.remove_bootstrapper(addr).await;
-            println!("removed {:?}", r);
-        }
-    });
+    // if args.len() < 1 {
+    //     return Err(XcliError::MismatchArgument(1, args.len()));
+    // }
+    //
+    // let ipfs = handler(app);
+    // let mut addrs = vec![];
+    // for arg in args {
+    //     let addr = MultiaddrWithPeerId::from_str(arg.clone())
+    //         .map_err(|e| XcliError::BadArgument(e.to_string()))?;
+    //     addrs.push(addr);
+    // }
+    //
+    // executor::block_on(async {
+    //     for addr in addrs {
+    //         let r = ipfs.remove_bootstrapper(addr).await;
+    //         println!("removed {:?}", r);
+    //     }
+    // });
 
     Ok(CmdExeCode::Ok)
 }

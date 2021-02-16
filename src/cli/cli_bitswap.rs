@@ -1,6 +1,6 @@
 use crate::cli::handler;
 use futures::executor;
-use libp2p::PeerId;
+use libp2p_rs::core::PeerId;
 use std::str::FromStr;
 use xcli::*;
 
@@ -28,7 +28,7 @@ fn cli_wl_bitswap(app: &App, args: &[&str]) -> XcliResult {
         peer = Some(p);
     }
 
-    let ipfs = handler(app);
+    let mut ipfs = handler(app);
     executor::block_on(async {
         ipfs.bitswap_wantlist(peer)
             .await
@@ -43,13 +43,13 @@ fn cli_wl_bitswap(app: &App, args: &[&str]) -> XcliResult {
 }
 
 fn cli_stat_bitswap(app: &App, _args: &[&str]) -> XcliResult {
-    let ipfs = handler(app);
-    executor::block_on(async {
-        let r = ipfs.bitswap_stats().await;
-        if let Ok(st) = r {
-            println!("{:?}", st);
-        }
-    });
+    // let ipfs = handler(app);
+    // executor::block_on(async {
+    //     let r = ipfs.bitswap_stats().await;
+    //     if let Ok(st) = r {
+    //         println!("{:?}", st);
+    //     }
+    // });
 
     Ok(CmdExeCode::Ok)
 }

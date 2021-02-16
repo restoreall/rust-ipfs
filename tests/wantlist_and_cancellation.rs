@@ -38,17 +38,17 @@ where
     }
 }
 
-async fn check_cid_subscriptions(ipfs: &Node, cid: &Cid, expected_count: usize) {
-    let subscription_count = {
-        let subs = ipfs.get_subscriptions().lock().unwrap();
-        if expected_count > 0 {
-            assert_eq!(subs.len(), 1);
-        }
-        subs.get(&cid.clone().into()).map(|l| l.len())
-    };
-    // treat None as 0
-    assert_eq!(subscription_count.unwrap_or(0), expected_count);
-}
+// async fn check_cid_subscriptions(ipfs: &Node, cid: &Cid, expected_count: usize) {
+//     let subscription_count = {
+//         let subs = ipfs.get_subscriptions().lock().unwrap();
+//         if expected_count > 0 {
+//             assert_eq!(subs.len(), 1);
+//         }
+//         subs.get(&cid.clone().into()).map(|l| l.len())
+//     };
+//     // treat None as 0
+//     assert_eq!(subscription_count.unwrap_or(0), expected_count);
+// }
 
 /// Check if canceling a Cid affects the wantlist.
 #[tokio::test]

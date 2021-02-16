@@ -1,100 +1,77 @@
-use crate::error::BitswapError;
-/// Reperesents a prototype for an upgrade to handle the bitswap protocol.
-///
-/// The protocol works the following way:
-///
-/// - TODO
 use crate::ledger::Message;
-use core::future::Future;
-use core::iter;
-use core::pin::Pin;
-use futures::io::{AsyncRead, AsyncWrite};
-use libp2p_core::{upgrade, InboundUpgrade, OutboundUpgrade, UpgradeInfo};
-use std::io;
+use crate::BS_PROTO_ID;
+use async_trait::async_trait;
+use futures::channel::mpsc;
+use futures::SinkExt;
+use libp2p_rs::core::upgrade::UpgradeInfo;
+use libp2p_rs::core::{PeerId, ProtocolId};
+use libp2p_rs::runtime::task;
+use libp2p_rs::swarm::connection::Connection;
+use libp2p_rs::swarm::protocol_handler::{IProtocolHandler, Notifiee, ProtocolHandler};
+use libp2p_rs::swarm::substream::Substream;
+use libp2p_rs::traits::ReadEx;
+use std::error::Error;
 
-// Undocumented, but according to JS the bitswap messages have a max size of 512*1024 bytes
-// https://github.com/ipfs/js-ipfs-bitswap/blob/d8f80408aadab94c962f6b88f343eb9f39fa0fcc/src/decision-engine/index.js#L16
 const MAX_BUF_SIZE: usize = 524_288;
 
-type FutureResult<T, E> = Pin<Box<dyn Future<Output = Result<T, E>> + Send>>;
+pub(crate) enum PeerEvent {
+    NewPeer(PeerId),
+    DeadPeer(PeerId),
+}
 
-#[derive(Clone, Copy, Debug, Default)]
-pub struct BitswapConfig;
+#[derive(Clone)]
+pub struct Handler {
+    incoming_tx: mpsc::UnboundedSender<(PeerId, Message)>,
+    new_peer: mpsc::UnboundedSender<PeerEvent>,
+}
 
-impl UpgradeInfo for BitswapConfig {
-    type Info = &'static [u8];
-    type InfoIter = iter::Once<Self::Info>;
-
-    fn protocol_info(&self) -> Self::InfoIter {
-        // b"/ipfs/bitswap", b"/ipfs/bitswap/1.0.0"
-        iter::once(b"/ipfs/bitswap/1.1.0")
+impl Handler {
+    pub(crate) fn new(
+        incoming_tx: mpsc::UnboundedSender<(PeerId, Message)>,
+        new_peer: mpsc::UnboundedSender<PeerEvent>,
+    ) -> Self {
+        Handler {
+            incoming_tx,
+            new_peer,
+        }
     }
 }
 
-impl<TSocket> InboundUpgrade<TSocket> for BitswapConfig
-where
-    TSocket: AsyncRead + AsyncWrite + Send + Unpin + 'static,
-{
-    type Output = Message;
-    type Error = BitswapError;
-    type Future = FutureResult<Self::Output, Self::Error>;
+impl UpgradeInfo for Handler {
+    type Info = ProtocolId;
 
-    #[inline]
-    fn upgrade_inbound(self, mut socket: TSocket, _info: Self::Info) -> Self::Future {
-        Box::pin(async move {
-            let packet = upgrade::read_one(&mut socket, MAX_BUF_SIZE).await?;
+    fn protocol_info(&self) -> Vec<Self::Info> {
+        vec![BS_PROTO_ID.into()]
+    }
+}
+
+impl Notifiee for Handler {
+    fn connected(&mut self, conn: &mut Connection) {
+        let peer_id = conn.remote_peer();
+        let mut new_peers = self.new_peer.clone();
+        task::spawn(async move {
+            let _ = new_peers.send(PeerEvent::NewPeer(peer_id)).await;
+        });
+    }
+}
+
+#[async_trait]
+impl ProtocolHandler for Handler {
+    async fn handle(
+        &mut self,
+        mut stream: Substream,
+        _info: <Self as UpgradeInfo>::Info,
+    ) -> Result<(), Box<dyn Error>> {
+        log::trace!("Handle stream from {}", stream.remote_peer());
+        loop {
+            let packet = stream.read_one(MAX_BUF_SIZE).await?;
             let message = Message::from_bytes(&packet)?;
-            Ok(message)
-        })
+            let peer = stream.remote_peer();
+            self.incoming_tx.send((peer, message)).await;
+        }
     }
-}
 
-impl UpgradeInfo for Message {
-    type Info = &'static [u8];
-    type InfoIter = iter::Once<Self::Info>;
-
-    fn protocol_info(&self) -> Self::InfoIter {
-        // b"/ipfs/bitswap", b"/ipfs/bitswap/1.0.0"
-        iter::once(b"/ipfs/bitswap/1.1.0")
-    }
-}
-
-impl<TSocket> OutboundUpgrade<TSocket> for Message
-where
-    TSocket: AsyncRead + AsyncWrite + Send + Unpin + 'static,
-{
-    type Output = ();
-    type Error = io::Error;
-    type Future = FutureResult<Self::Output, Self::Error>;
-
-    #[inline]
-    fn upgrade_outbound(self, mut socket: TSocket, _info: Self::Info) -> Self::Future {
-        Box::pin(async move {
-            let bytes = self.to_bytes();
-            upgrade::write_one(&mut socket, bytes).await
-        })
-    }
-}
-
-/// An object to facilitate communication between the `OneShotHandler` and the `BitswapHandler`.
-#[derive(Debug)]
-pub enum MessageWrapper {
-    /// We received a `Message` from a remote.
-    Rx(Message),
-    /// We successfully sent a `Message`.
-    Tx,
-}
-
-impl From<Message> for MessageWrapper {
-    #[inline]
-    fn from(message: Message) -> Self {
-        Self::Rx(message)
-    }
-}
-
-impl From<()> for MessageWrapper {
-    #[inline]
-    fn from(_: ()) -> Self {
-        Self::Tx
+    fn box_clone(&self) -> IProtocolHandler {
+        Box::new(self.clone())
     }
 }
