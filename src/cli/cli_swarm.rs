@@ -69,7 +69,7 @@ fn cli_swarm_disconnect(app: &App, args: &[&str]) -> XcliResult {
 }
 
 fn cli_swarm_addrs(app: &App, _args: &[&str]) -> XcliResult {
-    let mut ipfs = handler(app);
+    let ipfs = handler(app);
     executor::block_on(async {
         let r = ipfs.addrs().await;
         if let Ok(addrs) = r {

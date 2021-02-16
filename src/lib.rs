@@ -45,21 +45,19 @@ use futures::{
     channel::{
         mpsc::{Receiver},
     },
-    stream::{Fuse, Stream},
+    stream::Stream,
 };
 use tracing::Span;
 use tracing_futures::Instrument;
 
 use std::{
     borrow::Borrow,
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     env, fmt,
     future::Future,
     ops::{Deref, DerefMut, Range},
     path::PathBuf,
-    pin::Pin,
     sync::{atomic::Ordering, Arc},
-    task::{Context, Poll},
 };
 
 use self::{

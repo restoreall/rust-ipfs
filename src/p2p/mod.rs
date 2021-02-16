@@ -39,9 +39,6 @@ use libp2p_rs::core::transport::upgrade::TransportUpgrade;
 use libp2p_rs::tcp::TcpConfig;
 use libp2p_rs::dns::DnsConfig;
 
-use libp2p_rs::swarm::protocol_handler::ProtocolHandler;
-
-
 /// Libp2p Network controllers.
 pub struct Controls<Types: IpfsTypes> {
     repo: Arc<Repo<Types>>,
@@ -159,13 +156,9 @@ pub async fn create_controls<TIpfsTypes: IpfsTypes>(
 
     let bitswap = Bitswap::new(Box::new(TestRepo));
     let bitswap_control = bitswap.control();
-    let mut handler = bitswap.handler();
-
-    // let a = handler.protocol_info();
-    // handler.handle();
 
     // register bitswap into Swarm
-    swarm = swarm.with_protocol(Box::new(handler));
+    swarm = swarm.with_protocol(Box::new(bitswap.handler()));
 
         // To start Swarm/Kad/... main loops
     kad.start(swarm_control.clone());

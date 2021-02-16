@@ -62,7 +62,7 @@ fn run(peer: PeerId, addr: Multiaddr) {
             let msg = line.trim_end_matches(x);
 
             let cid = Cid::from_str(msg).expect("invalid cid");
-            let rx = bitswap.want_block(cid.clone()).await;
+            let rx = bitswap.want_block(cid.clone(), 1).await;
             let block = rx.await.unwrap();
             log::info!("{}: {:?}", cid, block)
         }

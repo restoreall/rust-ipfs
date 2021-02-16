@@ -17,10 +17,11 @@ cid = { default-features = false, version = "0.5" }
 futures = { version = "0.3", features = ["std"], default-features = false }
 multihash = { default-features = false, version = "0.11" }
 unsigned-varint = { default-features = false, version = "0.3" }
-libp2p-rs = { git = "https://github.com/kingwel-xie/libp2p-rs.git", branch = "master", default-features = true, optional = false }
 log = "0.4"
 prost = { version = "0.7", features = ["std"], default-features = false }
 thiserror = "1.0"
+#libp2p-rs = { default-features = true, path = "../../../libp2p-rs" }
+libp2p-rs = { git = "https://github.com/kingwel-xie/libp2p-rs.git", branch = "master", default-features = true }
 
 [build-dependencies]
 prost-build = "0.7"

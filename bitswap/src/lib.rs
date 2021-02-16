@@ -9,7 +9,6 @@ mod stat;
 
 use cid::Cid;
 use std::error::Error;
-use std::fmt::Debug;
 
 pub use bitswap::Bitswap;
 pub use block::Block;
