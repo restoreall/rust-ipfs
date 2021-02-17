@@ -496,7 +496,7 @@ dependencies = [
  "cid",
  "env_logger",
  "futures",
- "libp2p-rs 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
+ "libp2p-rs",
  "log",
  "multihash 0.11.4",
  "prost 0.7.0",
@@ -1886,7 +1886,7 @@ dependencies = [
  "hex-literal",
  "ipconfig",
  "ipfs-unixfs",
- "libp2p-rs 0.2.1",
+ "libp2p-rs",
  "log",
  "multibase",
  "multihash 0.11.4",
@@ -2040,96 +2040,31 @@ checksum = "b7282d924be3275cec7f6756ff4121987bc6481325397dde6ba3e7802b1a8b1c"
 [[package]]
 name = "libp2p-rs"
 version = "0.2.1"
-dependencies = [
- "async-trait",
- "libc",
- "libp2prs-core 0.2.1",
- "libp2prs-dns 0.2.1",
- "libp2prs-exporter 0.2.1",
- "libp2prs-floodsub 0.2.1",
- "libp2prs-infoserver 0.2.1",
- "libp2prs-kad 0.2.1",
- "libp2prs-mdns 0.2.1",
- "libp2prs-mplex 0.2.1",
- "libp2prs-multiaddr 0.2.1",
- "libp2prs-noise 0.2.1",
- "libp2prs-plaintext 0.2.1",
- "libp2prs-runtime 0.2.1",
- "libp2prs-secio 0.2.1",
- "libp2prs-swarm 0.2.1",
- "libp2prs-tcp 0.2.1",
- "libp2prs-traits 0.2.1",
- "libp2prs-websocket 0.2.1",
- "libp2prs-yamux 0.2.1",
- "log",
- "winapi",
- "xcli 0.5.2",
-]
-
-[[package]]
-name = "libp2p-rs"
-version = "0.2.1"
 source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#3e277b33386b0627a8e98d743511cab5661bb9b2"
 dependencies = [
  "async-trait",
  "libc",
- "libp2prs-core 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-dns 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-exporter 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-floodsub 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-infoserver 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-kad 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-mdns 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-mplex 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-multiaddr 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-noise 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-plaintext 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-runtime 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-secio 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-swarm 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-tcp 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-traits 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-websocket 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-yamux 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
+ "libp2prs-core",
+ "libp2prs-dns",
+ "libp2prs-exporter",
+ "libp2prs-floodsub",
+ "libp2prs-infoserver",
+ "libp2prs-kad",
+ "libp2prs-mdns",
+ "libp2prs-mplex",
+ "libp2prs-multiaddr",
+ "libp2prs-noise",
+ "libp2prs-plaintext",
+ "libp2prs-runtime",
+ "libp2prs-secio",
+ "libp2prs-swarm",
+ "libp2prs-tcp",
+ "libp2prs-traits",
+ "libp2prs-websocket",
+ "libp2prs-yamux",
  "log",
  "winapi",
  "xcli 0.5.2",
-]
-
-[[package]]
-name = "libp2prs-core"
-version = "0.2.1"
-dependencies = [
- "asn1_der",
- "async-trait",
- "bs58",
- "bytes 0.5.6",
- "ed25519-dalek",
- "fnv",
- "futures",
- "futures-timer",
- "lazy_static",
- "libp2prs-multiaddr 0.2.1",
- "libp2prs-traits 0.2.1",
- "libsecp256k1",
- "log",
- "multihash 0.13.2",
- "parking_lot 0.10.2",
- "pin-project 0.4.27",
- "prost 0.6.1",
- "prost-build 0.6.1",
- "rand 0.7.3",
- "ring",
- "rw-stream-sink",
- "salsa20",
- "serde",
- "serde_json",
- "sha2 0.8.2",
- "sha3 0.8.2",
- "smallvec",
- "thiserror",
- "unsigned-varint 0.4.0",
- "zeroize",
 ]
 
 [[package]]
@@ -2146,8 +2081,8 @@ dependencies = [
  "futures",
  "futures-timer",
  "lazy_static",
- "libp2prs-multiaddr 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-traits 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
+ "libp2prs-multiaddr",
+ "libp2prs-traits",
  "libsecp256k1",
  "log",
  "multihash 0.13.2",
@@ -2172,38 +2107,12 @@ dependencies = [
 [[package]]
 name = "libp2prs-dns"
 version = "0.2.1"
-dependencies = [
- "async-trait",
- "libp2prs-core 0.2.1",
- "libp2prs-runtime 0.2.1",
- "log",
-]
-
-[[package]]
-name = "libp2prs-dns"
-version = "0.2.1"
 source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#3e277b33386b0627a8e98d743511cab5661bb9b2"
 dependencies = [
  "async-trait",
- "libp2prs-core 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-runtime 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
+ "libp2prs-core",
+ "libp2prs-runtime",
  "log",
-]
-
-[[package]]
-name = "libp2prs-exporter"
-version = "0.2.1"
-dependencies = [
- "futures",
- "lazy_static",
- "libp2prs-core 0.2.1",
- "libp2prs-runtime 0.2.1",
- "libp2prs-swarm 0.2.1",
- "log",
- "prometheus",
- "serde",
- "serde_json",
- "tide",
 ]
 
 [[package]]
@@ -2213,9 +2122,9 @@ source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#3e277b3
 dependencies = [
  "futures",
  "lazy_static",
- "libp2prs-core 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-runtime 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-swarm 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
+ "libp2prs-core",
+ "libp2prs-runtime",
+ "libp2prs-swarm",
  "log",
  "prometheus",
  "serde",
@@ -2226,32 +2135,14 @@ dependencies = [
 [[package]]
 name = "libp2prs-floodsub"
 version = "0.2.1"
-dependencies = [
- "async-trait",
- "futures",
- "libp2prs-core 0.2.1",
- "libp2prs-runtime 0.2.1",
- "libp2prs-swarm 0.2.1",
- "libp2prs-traits 0.2.1",
- "log",
- "nohash-hasher",
- "prost 0.6.1",
- "prost-build 0.6.1",
- "rand 0.7.3",
- "smallvec",
-]
-
-[[package]]
-name = "libp2prs-floodsub"
-version = "0.2.1"
 source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#3e277b33386b0627a8e98d743511cab5661bb9b2"
 dependencies = [
  "async-trait",
  "futures",
- "libp2prs-core 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-runtime 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-swarm 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-traits 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
+ "libp2prs-core",
+ "libp2prs-runtime",
+ "libp2prs-swarm",
+ "libp2prs-traits",
  "log",
  "nohash-hasher",
  "prost 0.6.1",
@@ -2263,54 +2154,16 @@ dependencies = [
 [[package]]
 name = "libp2prs-infoserver"
 version = "0.2.1"
-dependencies = [
- "lazy_static",
- "libp2prs-core 0.2.1",
- "libp2prs-runtime 0.2.1",
- "libp2prs-swarm 0.2.1",
- "log",
- "serde",
- "serde_json",
- "tide",
-]
-
-[[package]]
-name = "libp2prs-infoserver"
-version = "0.2.1"
 source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#3e277b33386b0627a8e98d743511cab5661bb9b2"
 dependencies = [
  "lazy_static",
- "libp2prs-core 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-runtime 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-swarm 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
+ "libp2prs-core",
+ "libp2prs-runtime",
+ "libp2prs-swarm",
  "log",
  "serde",
  "serde_json",
  "tide",
-]
-
-[[package]]
-name = "libp2prs-kad"
-version = "0.2.1"
-dependencies = [
- "arrayvec",
- "async-trait",
- "bytes 0.5.6",
- "fnv",
- "futures",
- "libp2prs-core 0.2.1",
- "libp2prs-runtime 0.2.1",
- "libp2prs-swarm 0.2.1",
- "libp2prs-traits 0.2.1",
- "log",
- "primitive-types",
- "prost 0.6.1",
- "prost-build 0.6.1",
- "rand 0.7.3",
- "sha2 0.9.3",
- "smallvec",
- "void",
- "xcli 0.5.2",
 ]
 
 [[package]]
@@ -2323,10 +2176,10 @@ dependencies = [
  "bytes 0.5.6",
  "fnv",
  "futures",
- "libp2prs-core 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-runtime 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-swarm 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-traits 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
+ "libp2prs-core",
+ "libp2prs-runtime",
+ "libp2prs-swarm",
+ "libp2prs-traits",
  "log",
  "primitive-types",
  "prost 0.6.1",
@@ -2341,25 +2194,6 @@ dependencies = [
 [[package]]
 name = "libp2prs-mdns"
 version = "0.2.1"
-dependencies = [
- "data-encoding",
- "dns-parser",
- "either",
- "futures",
- "futures-timer",
- "lazy_static",
- "libp2prs-core 0.2.1",
- "libp2prs-runtime 0.2.1",
- "log",
- "net2",
- "nohash-hasher",
- "rand 0.7.3",
- "smallvec",
-]
-
-[[package]]
-name = "libp2prs-mdns"
-version = "0.2.1"
 source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#3e277b33386b0627a8e98d743511cab5661bb9b2"
 dependencies = [
  "data-encoding",
@@ -2368,29 +2202,13 @@ dependencies = [
  "futures",
  "futures-timer",
  "lazy_static",
- "libp2prs-core 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-runtime 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
+ "libp2prs-core",
+ "libp2prs-runtime",
  "log",
  "net2",
  "nohash-hasher",
  "rand 0.7.3",
  "smallvec",
-]
-
-[[package]]
-name = "libp2prs-mplex"
-version = "0.2.1"
-dependencies = [
- "async-trait",
- "bytes 0.5.6",
- "futures",
- "futures-timer",
- "libp2prs-core 0.2.1",
- "libp2prs-traits 0.2.1",
- "log",
- "nohash-hasher",
- "rand 0.7.3",
- "unsigned-varint 0.4.0",
 ]
 
 [[package]]
@@ -2402,27 +2220,12 @@ dependencies = [
  "bytes 0.5.6",
  "futures",
  "futures-timer",
- "libp2prs-core 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-traits 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
+ "libp2prs-core",
+ "libp2prs-traits",
  "log",
  "nohash-hasher",
  "rand 0.7.3",
  "unsigned-varint 0.4.0",
-]
-
-[[package]]
-name = "libp2prs-multiaddr"
-version = "0.2.1"
-dependencies = [
- "arrayref",
- "bs58",
- "byteorder",
- "data-encoding",
- "multihash 0.13.2",
- "percent-encoding",
- "serde",
- "static_assertions",
- "unsigned-varint 0.5.1",
 ]
 
 [[package]]
@@ -2444,28 +2247,6 @@ dependencies = [
 [[package]]
 name = "libp2prs-noise"
 version = "0.2.1"
-dependencies = [
- "async-trait",
- "bytes 0.5.6",
- "curve25519-dalek 2.1.2",
- "futures",
- "lazy_static",
- "libp2prs-core 0.2.1",
- "libp2prs-traits 0.2.1",
- "log",
- "prost 0.6.1",
- "prost-build 0.6.1",
- "rand 0.7.3",
- "sha2 0.8.2",
- "snow",
- "static_assertions",
- "x25519-dalek 0.6.0",
- "zeroize",
-]
-
-[[package]]
-name = "libp2prs-noise"
-version = "0.2.1"
 source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#3e277b33386b0627a8e98d743511cab5661bb9b2"
 dependencies = [
  "async-trait",
@@ -2473,8 +2254,8 @@ dependencies = [
  "curve25519-dalek 2.1.2",
  "futures",
  "lazy_static",
- "libp2prs-core 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-traits 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
+ "libp2prs-core",
+ "libp2prs-traits",
  "log",
  "prost 0.6.1",
  "prost-build 0.6.1",
@@ -2489,39 +2270,16 @@ dependencies = [
 [[package]]
 name = "libp2prs-plaintext"
 version = "0.2.1"
-dependencies = [
- "async-trait",
- "bytes 0.5.6",
- "futures",
- "libp2prs-core 0.2.1",
- "libp2prs-traits 0.2.1",
- "log",
- "prost 0.6.1",
- "prost-build 0.6.1",
-]
-
-[[package]]
-name = "libp2prs-plaintext"
-version = "0.2.1"
 source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#3e277b33386b0627a8e98d743511cab5661bb9b2"
 dependencies = [
  "async-trait",
  "bytes 0.5.6",
  "futures",
- "libp2prs-core 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-traits 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
+ "libp2prs-core",
+ "libp2prs-traits",
  "log",
  "prost 0.6.1",
  "prost-build 0.6.1",
-]
-
-[[package]]
-name = "libp2prs-runtime"
-version = "0.2.1"
-dependencies = [
- "async-std",
- "futures",
- "once_cell",
 ]
 
 [[package]]
@@ -2537,27 +2295,6 @@ dependencies = [
 [[package]]
 name = "libp2prs-secio"
 version = "0.2.1"
-dependencies = [
- "aes-ctr",
- "async-trait",
- "bs58",
- "bytes 0.5.6",
- "futures",
- "libp2prs-core 0.2.1",
- "libp2prs-traits 0.2.1",
- "log",
- "prost 0.6.1",
- "prost-build 0.6.1",
- "rand 0.7.3",
- "ring",
- "secp256k1",
- "stream-cipher 0.4.1",
- "unsigned-varint 0.4.0",
-]
-
-[[package]]
-name = "libp2prs-secio"
-version = "0.2.1"
 source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#3e277b33386b0627a8e98d743511cab5661bb9b2"
 dependencies = [
  "aes-ctr",
@@ -2565,8 +2302,8 @@ dependencies = [
  "bs58",
  "bytes 0.5.6",
  "futures",
- "libp2prs-core 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-traits 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
+ "libp2prs-core",
+ "libp2prs-traits",
  "log",
  "prost 0.6.1",
  "prost-build 0.6.1",
@@ -2580,35 +2317,15 @@ dependencies = [
 [[package]]
 name = "libp2prs-swarm"
 version = "0.2.1"
-dependencies = [
- "async-trait",
- "crossbeam-epoch",
- "fnv",
- "futures",
- "libp2prs-core 0.2.1",
- "libp2prs-runtime 0.2.1",
- "libp2prs-traits 0.2.1",
- "log",
- "prost 0.6.1",
- "prost-build 0.6.1",
- "rand 0.7.3",
- "smallvec",
- "void",
- "xcli 0.5.2",
-]
-
-[[package]]
-name = "libp2prs-swarm"
-version = "0.2.1"
 source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#3e277b33386b0627a8e98d743511cab5661bb9b2"
 dependencies = [
  "async-trait",
  "crossbeam-epoch",
  "fnv",
  "futures",
- "libp2prs-core 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-runtime 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-traits 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
+ "libp2prs-core",
+ "libp2prs-runtime",
+ "libp2prs-traits",
  "log",
  "prost 0.6.1",
  "prost-build 0.6.1",
@@ -2621,21 +2338,6 @@ dependencies = [
 [[package]]
 name = "libp2prs-tcp"
 version = "0.2.1"
-dependencies = [
- "async-trait",
- "futures",
- "if-addrs",
- "if-watch",
- "ipnet",
- "libp2prs-core 0.2.1",
- "libp2prs-runtime 0.2.1",
- "log",
- "socket2",
-]
-
-[[package]]
-name = "libp2prs-tcp"
-version = "0.2.1"
 source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#3e277b33386b0627a8e98d743511cab5661bb9b2"
 dependencies = [
  "async-trait",
@@ -2643,19 +2345,10 @@ dependencies = [
  "if-addrs",
  "if-watch",
  "ipnet",
- "libp2prs-core 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-runtime 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
+ "libp2prs-core",
+ "libp2prs-runtime",
  "log",
  "socket2",
-]
-
-[[package]]
-name = "libp2prs-traits"
-version = "0.2.1"
-dependencies = [
- "async-trait",
- "futures",
- "unsigned-varint 0.4.0",
 ]
 
 [[package]]
@@ -2671,36 +2364,16 @@ dependencies = [
 [[package]]
 name = "libp2prs-websocket"
 version = "0.2.1"
-dependencies = [
- "async-tls",
- "async-trait",
- "either",
- "futures",
- "libp2prs-core 0.2.1",
- "libp2prs-dns 0.2.1",
- "libp2prs-tcp 0.2.1",
- "libp2prs-traits 0.2.1",
- "log",
- "rustls",
- "soketto",
- "url",
- "webpki",
- "webpki-roots",
-]
-
-[[package]]
-name = "libp2prs-websocket"
-version = "0.2.1"
 source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#3e277b33386b0627a8e98d743511cab5661bb9b2"
 dependencies = [
  "async-tls",
  "async-trait",
  "either",
  "futures",
- "libp2prs-core 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-dns 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-tcp 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-traits 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
+ "libp2prs-core",
+ "libp2prs-dns",
+ "libp2prs-tcp",
+ "libp2prs-traits",
  "log",
  "rustls",
  "soketto",
@@ -2712,28 +2385,13 @@ dependencies = [
 [[package]]
 name = "libp2prs-yamux"
 version = "0.2.1"
-dependencies = [
- "async-trait",
- "bytes 0.5.6",
- "futures",
- "libp2prs-core 0.2.1",
- "libp2prs-traits 0.2.1",
- "log",
- "nohash-hasher",
- "rand 0.7.3",
- "unsigned-varint 0.4.0",
-]
-
-[[package]]
-name = "libp2prs-yamux"
-version = "0.2.1"
 source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#3e277b33386b0627a8e98d743511cab5661bb9b2"
 dependencies = [
  "async-trait",
  "bytes 0.5.6",
  "futures",
- "libp2prs-core 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
- "libp2prs-traits 0.2.1 (git+https://github.com/kingwel-xie/libp2p-rs.git)",
+ "libp2prs-core",
+ "libp2prs-traits",
  "log",
  "nohash-hasher",
  "rand 0.7.3",
