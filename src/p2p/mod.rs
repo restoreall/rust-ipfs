@@ -252,14 +252,6 @@ impl<Types: IpfsTypes> Controls<Types> {
         //self.kad.remove_providing(&hash);
     }
 
-    // pub fn pubsub(&mut self) -> &mut Pubsub {
-    //     &mut self.pubsub
-    // }
-    //
-    // pub fn bitswap(&mut self) -> &mut Bitswap {
-    //     &mut self.bitswap
-    // }
-
     pub async fn bootstrap(&mut self) {
         self.kad.bootstrap().await;
     }

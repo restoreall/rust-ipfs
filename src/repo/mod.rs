@@ -382,11 +382,9 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
         )
     }
 
-    /// Shutdowns the repo, cancelling any pending subscriptions; Likely going away after some
-    /// refactoring, see notes on [`crate::Ipfs::exit_daemon`].
+    /// Shutdowns the repo, closes the repo event sender.
     pub fn shutdown(&self) {
-        // TODO: shutdown all pending operations
-        //self.subscriptions.shutdown();
+        self.events.clone().close_channel();
     }
 
     pub async fn init(&self) -> Result<(), Error> {

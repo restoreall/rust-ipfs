@@ -33,7 +33,6 @@ pub mod p2p;
 pub mod path;
 pub mod refs;
 pub mod repo;
-//mod subscription;
 pub mod unixfs;
 
 #[macro_use]
@@ -413,7 +412,6 @@ impl<Types: IpfsTypes> UninitializedIpfs<Types> {
         // };
 
         let mut bitswap = controls.bitswap().clone();
-
         let fut = async move {
             loop {
                 match repo_events.next().await {
@@ -1015,8 +1013,6 @@ impl<Types: IpfsTypes> Ipfs<Types> {
 
     /// Exit daemon.
     pub async fn exit_daemon(mut self) {
-        // FIXME: this is a stopgap measure needed while repo is part of the struct Ipfs instead of
-        // the background task or stream. After that this could be handled by dropping.
         self.repo.shutdown();
 
         self.controls.kad().close().await;
@@ -1136,35 +1132,26 @@ mod node {
             }
         }
 
-        // /// Returns the subscriptions for a `Node`.
-        // pub fn get_subscriptions(
-        //     &self,
-        // ) -> &std::sync::Mutex<subscription::Subscriptions<Block, String>> {
-        //     &self.ipfs.repo.subscriptions.subscriptions
-        // }
-
         /// Bootstraps the local node to join the DHT: it looks up the node's own ID in the
         /// DHT and introduces it to the other nodes in it; at least one other node must be
         /// known in order for the process to succeed. Subsequently, additional queries are
         /// ran with random keys so that the buckets farther from the closest neighbor also
         /// get refreshed.
-        pub async fn bootstrap(&mut self) -> Result<(), Error> {
+        pub async fn bootstrap(&mut self) {
             self.controls.kad().bootstrap().await;
-            Ok(())
         }
 
-        // /// Add a known listen address of a peer participating in the DHT to the routing table.
-        // /// This is mandatory in order for the peer to be discoverable by other members of the
-        // /// DHT.
-        // pub async fn add_peer(&self, peer_id: PeerId, mut addr: Multiaddr) -> Result<(), Error> {
-        //     // Kademlia::add_address requires the address to not contain the PeerId
-        //     if matches!(addr.iter().last(), Some(Protocol::P2p(_))) {
-        //         addr.pop();
-        //     }
-        //
-        //     self.ipfs.add_node(peer_id, vec![addr])
-        //
-        // }
+        /// Add a known listen address of a peer participating in the DHT to the routing table.
+        /// This is mandatory in order for the peer to be discoverable by other members of the
+        /// DHT.
+        pub async fn add_peer(&mut self, peer_id: PeerId, mut addr: Multiaddr) {
+            // Kademlia::add_address requires the address to not contain the PeerId
+            if matches!(addr.iter().last(), Some(Protocol::P2p(_))) {
+                addr.pop();
+            }
+
+            self.controls.kad().add_node(peer_id, vec![addr]).await;
+        }
 
         /// Returns the Bitswap peers for the a `Node`.
         pub async fn get_bitswap_peers(&self) -> Result<Vec<PeerId>, Error> {
