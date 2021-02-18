@@ -97,7 +97,6 @@ impl From<&IpfsOptions> for SwarmOptions {
 /// Creates a new IPFS swarm.
 pub async fn create_controls<TIpfsTypes: IpfsTypes>(
     options: SwarmOptions,
-    span: Span,
     repo: Arc<Repo<TIpfsTypes>>,
 ) -> Controls<TIpfsTypes> {
     // Set up an encrypted TCP transport over the Yamux or Mplex protocol.
@@ -111,9 +110,14 @@ pub async fn create_controls<TIpfsTypes: IpfsTypes>(
 
     // Make swarm
     let mut swarm = Swarm::new(options.keypair.public())
-        .with_transport(Box::new(DnsConfig::new(tu)))
+        .with_transport(Box::new(tu))
         .with_ping(PingConfig::new())
         .with_identify(IdentifyConfig::new(false));
+
+    let listen_addr: Multiaddr = "/ip4/0.0.0.0/tcp/8086".parse().unwrap();
+
+    swarm.listen_on(vec![listen_addr]).unwrap();
+
     let swarm_control = swarm.control();
 
     log::info!("Swarm created, local-peer-id={:?}", swarm.local_peer_id());
@@ -131,7 +135,7 @@ pub async fn create_controls<TIpfsTypes: IpfsTypes>(
     let store = MemoryStore::new(swarm.local_peer_id().clone());
     let kad = Kademlia::with_config(swarm.local_peer_id().clone(), store, kad_config);
 
-    let kad_control = kad.control();
+    let mut kad_control = kad.control();
 
     // update Swarm to support Kad and Routing
     swarm = swarm.with_protocol(Box::new(kad.handler())).with_routing(Box::new(kad.control()));
@@ -162,14 +166,13 @@ pub async fn create_controls<TIpfsTypes: IpfsTypes>(
 
         // To start Swarm/Kad/... main loops
     kad.start(swarm_control.clone());
-    swarm.start();
-
-    // kad_control.add_node(bootstrap_peer, vec![bootstrap_addr]).await;
-    // kad_control.bootstrap().await;
 
     for (addr, peer_id) in options.bootstrap {
-        // TODO: bootstrap kad ??
+        kad_control.add_node(peer_id, vec![addr]).await;
     }
+    kad_control.bootstrap().await;
+
+    swarm.start();
 
     Controls {
         repo,
@@ -195,48 +198,25 @@ pub async fn create_controls<TIpfsTypes: IpfsTypes>(
 
 
 impl<Types: IpfsTypes> Controls<Types> {
-
-    pub async fn add_peer(&mut self, peer: PeerId, addr: Multiaddr) {
-        self.kad.add_node(peer.clone(), vec![addr]).await;
-        //self.swarm.add_peer(peer);
-
-        // FIXME: the call below automatically performs a dial attempt
-        // to the given peer; it is unsure that we want it done within
-        // add_peer, especially since that peer might not belong to the
-        // expected identify protocol
-        //self.pubsub.add_node_to_partial_view(peer);
-        // TODO self.bitswap.add_node_to_partial_view(peer);
-    }
-
-    pub async fn remove_peer(&mut self, peer: &PeerId) {
-        self.kad.remove_node(peer.clone()).await;
-        //self.swarm.remove_peer(&peer);
-        //self.pubsub.remove_node_from_partial_view(&peer);
-        // TODO self.bitswap.remove_peer(&peer);
-    }
-
-    pub fn addrs(&self) -> Vec<(PeerId, Vec<Multiaddr>)> {
-        let peers = self.swarm.get_peers();
-        let mut addrs = Vec::with_capacity(peers.len());
-
-        for peer_id in peers.into_iter() {
-            let peer_addrs = self.swarm.get_addrs(&peer_id).unwrap_or(vec![]);
-            addrs.push((peer_id, peer_addrs));
-        }
-        addrs
-    }
-
-    // pub fn connections(&self) -> impl Iterator<Item = Connection> + '_ {
-    //     self.swarm.connections()
+    //
+    // pub async fn add_peer(&mut self, peer: PeerId, addr: Multiaddr) {
+    //     self.kad.add_node(peer.clone(), vec![addr]).await;
+    //     //self.swarm.add_peer(peer);
+    //
+    //     // FIXME: the call below automatically performs a dial attempt
+    //     // to the given peer; it is unsure that we want it done within
+    //     // add_peer, especially since that peer might not belong to the
+    //     // expected identify protocol
+    //     //self.pubsub.add_node_to_partial_view(peer);
+    //     // TODO self.bitswap.add_node_to_partial_view(peer);
     // }
-
-    pub async fn connect(&mut self, addr: MultiaddrWithPeerId) -> Result<(), SwarmError> {
-        self.swarm.connect_with_addrs(addr.peer_id, vec![addr.multiaddr.into()]).await
-    }
-
-    pub async fn disconnect(&mut self, addr: MultiaddrWithPeerId) -> Result<(), SwarmError> {
-        self.swarm.disconnect(addr.peer_id).await
-    }
+    //
+    // pub async fn remove_peer(&mut self, peer: &PeerId) {
+    //     self.kad.remove_node(peer.clone()).await;
+    //     //self.swarm.remove_peer(&peer);
+    //     //self.pubsub.remove_node_from_partial_view(&peer);
+    //     // TODO self.bitswap.remove_peer(&peer);
+    // }
 
     // FIXME: it would be best if get_providers is called only in case the already connected
     // peers don't have it
@@ -252,8 +232,15 @@ impl<Types: IpfsTypes> Controls<Types> {
         //self.kad.remove_providing(&hash);
     }
 
-    pub async fn bootstrap(&mut self) {
-        self.kad.bootstrap().await;
+    pub fn addrs(&self) -> Vec<(PeerId, Vec<Multiaddr>)> {
+        let peers = self.swarm.get_peers();
+        let mut addrs = Vec::with_capacity(peers.len());
+
+        for peer_id in peers.into_iter() {
+            let peer_addrs = self.swarm.get_addrs(&peer_id).unwrap_or(vec![]);
+            addrs.push((peer_id, peer_addrs));
+        }
+        addrs
     }
 
     pub fn swarm(&mut self) -> &mut SwarmControl {

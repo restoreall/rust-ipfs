@@ -378,10 +378,6 @@ impl<Types: IpfsTypes> UninitializedIpfs<Types> {
         // stored in the Ipfs, instrumenting every method call
         let facade_span = tracing::trace_span!("facade");
 
-        // stored in the executor given to libp2p, used to spawn at least the connections,
-        // instrumenting each of those.
-        let exec_span = tracing::trace_span!(parent: &root_span, "exec");
-
         // instruments the IpfsFuture, the background task.
         let swarm_span = tracing::trace_span!(parent: &root_span, "swarm");
 
@@ -390,7 +386,7 @@ impl<Types: IpfsTypes> UninitializedIpfs<Types> {
         // FIXME: mutating options above is an unfortunate side-effect of this call, which could be
         // reordered for less error prone code.
         let swarm_options = SwarmOptions::from(&options);
-        let mut controls = create_controls(swarm_options, exec_span, repo.clone())
+        let mut controls = create_controls(swarm_options, repo.clone())
             .instrument(tracing::trace_span!(parent: &init_span, "swarm"))
             .await;
 
@@ -698,6 +694,18 @@ impl<Types: IpfsTypes> Ipfs<Types> {
         .await
     }
 
+    /// Bootstraps the Kad-DHT.
+    ///
+    /// Assumes the bootstrap nodes have been added to the routing table already.
+    /// Check [SwarmOptions::bootstrap] for details.
+    pub async fn bootstrap(&mut self) {
+        self.controls.kad().bootstrap().await;
+    }
+
+    // pub fn connections(&self) -> impl Iterator<Item = Connection> + '_ {
+    //     self.swarm.connections()
+    // }
+
     /// Connects to the peer at the given Multiaddress.
     ///
     /// Accepts only multiaddresses with the PeerId to authenticate the connection.
@@ -706,6 +714,17 @@ impl<Types: IpfsTypes> Ipfs<Types> {
     /// failed for whatever reason.
     pub async fn connect(&mut self, target: MultiaddrWithPeerId) -> Result<(), Error> {
         self.controls.swarm().connect_with_addrs(target.peer_id, vec![target.multiaddr.into()])
+            .instrument(self.span.clone())
+            .await
+            .map_err(Error::from)
+    }
+
+    /// Disconnects a given peer.
+    ///
+    /// At the moment the peer is disconnected by temporarily banning the peer and unbanning it
+    /// right after. This should always disconnect all connections to the peer.
+    pub async fn disconnect(&mut self, target: MultiaddrWithPeerId) -> Result<(), Error> {
+        self.controls.swarm().disconnect(target.peer_id)
             .instrument(self.span.clone())
             .await
             .map_err(Error::from)
@@ -745,17 +764,6 @@ impl<Types: IpfsTypes> Ipfs<Types> {
             .collect();
 
         Ok(cc)
-    }
-
-    /// Disconnects a given peer.
-    ///
-    /// At the moment the peer is disconnected by temporarily banning the peer and unbanning it
-    /// right after. This should always disconnect all connections to the peer.
-    pub async fn disconnect(&mut self, target: MultiaddrWithPeerId) -> Result<(), Error> {
-        self.controls.swarm().disconnect(target.peer_id)
-            .instrument(self.span.clone())
-            .await
-            .map_err(Error::from)
     }
 
     /// Returns the local node public key and the listened and externally visible addresses.
