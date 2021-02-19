@@ -62,10 +62,7 @@ use std::{
 use self::{
     dag::IpldDag,
     ipns::Ipns,
-    p2p::{
-        addr::{could_be_bound_from_ephemeral, starts_unspecified},
-        create_controls, SwarmOptions,
-    },
+    p2p::{create_controls, SwarmOptions},
     repo::{create_repo, Repo, RepoEvent, RepoOptions},
 };
 
@@ -185,7 +182,7 @@ impl IpfsOptions {
             mdns: Default::default(),
             bootstrap: Default::default(),
             // default to lan kad for go-ipfs use in tests
-            kad_protocol: Some("/ipfs/lan/kad/1.0.0".to_owned()),
+            kad_protocol: Some("/ipfs/kad/1.0.0".to_owned()),
             listening_addrs: vec!["/ip4/127.0.0.1/tcp/0".parse().unwrap()],
             span: None,
         }
@@ -378,8 +375,8 @@ impl<Types: IpfsTypes> UninitializedIpfs<Types> {
         // stored in the Ipfs, instrumenting every method call
         let facade_span = tracing::trace_span!("facade");
 
-        // instruments the IpfsFuture, the background task.
-        let swarm_span = tracing::trace_span!(parent: &root_span, "swarm");
+        // instruments the Ipfs main loop, the background task.
+        let ipfs_span = tracing::trace_span!(parent: &root_span, "ipfs");
 
         repo.init().instrument(init_span.clone()).await?;
 
@@ -440,7 +437,7 @@ impl<Types: IpfsTypes> UninitializedIpfs<Types> {
         //     fut.start_add_listener_address(addr, None);
         // }
 
-        Ok((ipfs, fut.instrument(swarm_span)))
+        Ok((ipfs, fut.instrument(ipfs_span)))
     }
 }
 

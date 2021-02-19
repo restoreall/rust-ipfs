@@ -2,7 +2,6 @@
 use std::time::Duration;
 use std::sync::Arc;
 use std::error::Error;
-use tracing::Span;
 
 use crate::repo::Repo;
 use crate::{IpfsOptions, IpfsTypes, Cid};
@@ -33,7 +32,7 @@ use libp2p_rs::swarm::ping::PingConfig;
 use libp2p_rs::kad::kad::{KademliaConfig, Kademlia};
 use libp2p_rs::floodsub::FloodsubConfig;
 use libp2p_rs::floodsub::floodsub::FloodSub;
-use libp2p_rs::{noise, yamux, mplex};
+use libp2p_rs::{noise, yamux, mplex, secio};
 use libp2p_rs::core::upgrade::Selector;
 use libp2p_rs::core::transport::upgrade::TransportUpgrade;
 use libp2p_rs::tcp::TcpConfig;
@@ -103,12 +102,15 @@ pub async fn create_controls<TIpfsTypes: IpfsTypes>(
     options: SwarmOptions,
     repo: Arc<Repo<TIpfsTypes>>,
 ) -> Controls<TIpfsTypes> {
+    let sec_secio = secio::Config::new(options.keypair.clone());
     // Set up an encrypted TCP transport over the Yamux or Mplex protocol.
     let xx_keypair = noise::Keypair::<noise::X25519Spec>::new()
         .into_authentic(&options.keypair)
         .unwrap();
-    let sec = noise::NoiseConfig::xx(xx_keypair, options.keypair.clone());
+    let sec_noise = noise::NoiseConfig::xx(xx_keypair, options.keypair.clone());
+    let sec = Selector::new(sec_noise, sec_secio);
 
+    // FIXME: timeout & DnsConfig
     let mux = Selector::new(yamux::Config::new(), mplex::Config::new());
     let tu = TransportUpgrade::new(TcpConfig::new().nodelay(true), mux, sec);//.timeout(Duration::from_secs(20));
 
@@ -125,7 +127,7 @@ pub async fn create_controls<TIpfsTypes: IpfsTypes>(
     log::info!("Swarm created, local-peer-id={:?}", swarm.local_peer_id());
 
     // build Kad
-    let mut kad_config = KademliaConfig::default().with_query_timeout(Duration::from_secs(180));
+    let mut kad_config = KademliaConfig::default().with_query_timeout(Duration::from_secs(90));
     if let Some(protocol) = options.kad_protocol {
         fn string_to_static_str(s: String) -> &'static str {
             Box::leak(s.into_boxed_str())
@@ -150,7 +152,6 @@ pub async fn create_controls<TIpfsTypes: IpfsTypes>(
 
     // register floodsub into Swarm
     swarm = swarm.with_protocol(Box::new(floodsub.handler()));
-
 
     // bitswap
     struct TestRepo;

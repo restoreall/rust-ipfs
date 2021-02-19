@@ -1,7 +1,6 @@
 mod cli_bitswap;
 mod cli_block;
 mod cli_dag;
-mod cli_listen;
 mod cli_unixfs;
 
 use crate::{Ipfs, TestTypes};
@@ -25,7 +24,6 @@ pub(crate) fn ipfs_cli_commands<'a>() -> Command<'a> {
         .subcommand(cli_block::cli_block_commands())
         .subcommand(cli_dag::cli_dag_commands())
         .subcommand(cli_bitswap::cli_bitswap_commands())
-        .subcommand(cli_listen::cli_listen_commands())
 }
 
 pub(crate) fn handler(app: &App) -> Ipfs<TestTypes> {

@@ -172,6 +172,7 @@ impl fmt::Display for MultiaddrWithPeerId {
 }
 
 // Checks if the multiaddr starts with ip4 or ip6 unspecified address, like 0.0.0.0
+#[allow(dead_code)]
 pub(crate) fn starts_unspecified(addr: &Multiaddr) -> bool {
     match addr.iter().next() {
         Some(Protocol::Ip4(ip4)) if ip4.is_unspecified() => true,
@@ -180,6 +181,7 @@ pub(crate) fn starts_unspecified(addr: &Multiaddr) -> bool {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) fn could_be_bound_from_ephemeral(
     skip: usize,
     bound: &Multiaddr,
