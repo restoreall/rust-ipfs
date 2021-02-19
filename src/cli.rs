@@ -1,18 +1,21 @@
 mod cli_bitswap;
 mod cli_block;
-mod cli_bootstrap;
 mod cli_dag;
-mod cli_dht;
 mod cli_listen;
-mod cli_swarm;
 mod cli_unixfs;
 
 use crate::{Ipfs, TestTypes};
-use xcli::*;
+use libp2p_rs::xcli::*;
+
+pub use libp2p_rs::swarm::cli::swarm_cli_commands as scli;
 
 const IPFS: &str = "ipfs";
 
-pub fn ipfs_cli_commands<'a>() -> Command<'a> {
+
+
+
+
+pub(crate) fn ipfs_cli_commands<'a>() -> Command<'a> {
     Command::new_with_alias("ipfs", "i")
         .about("IPFS")
         .usage("ipfs")
@@ -21,10 +24,7 @@ pub fn ipfs_cli_commands<'a>() -> Command<'a> {
         .subcommand(cli_unixfs::cli_get_commands())
         .subcommand(cli_block::cli_block_commands())
         .subcommand(cli_dag::cli_dag_commands())
-        .subcommand(cli_swarm::cli_swarm_commands())
         .subcommand(cli_bitswap::cli_bitswap_commands())
-        .subcommand(cli_dht::cli_dht_commands())
-        .subcommand(cli_bootstrap::cli_bootstrap_commands())
         .subcommand(cli_listen::cli_listen_commands())
 }
 

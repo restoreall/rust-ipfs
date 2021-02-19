@@ -390,22 +390,12 @@ impl<Types: IpfsTypes> UninitializedIpfs<Types> {
             .instrument(tracing::trace_span!(parent: &init_span, "swarm"))
             .await;
 
-        let IpfsOptions {
-            listening_addrs, ..
-        } = options;
-
         let ipfs = Ipfs {
             span: facade_span,
             repo,
             keys: DebuggableKeypair(keys),
             controls: controls.clone(),
         };
-
-        // let mut fut = IpfsFuture {
-        //     repo_events: repo_events.fuse(),
-        //     controls: controls.clone(),
-        //     listening_addresses: HashMap::with_capacity(listening_addrs.len()),
-        // };
 
         let mut bitswap = controls.bitswap().clone();
         let fut = async move {
@@ -438,7 +428,8 @@ impl<Types: IpfsTypes> UninitializedIpfs<Types> {
                         }
                     }
                     None => {
-                        panic!("never gonna happen");
+                        log::warn!("we are closed. exiting...");
+                        return;
                     }
                 }
             }
@@ -454,6 +445,9 @@ impl<Types: IpfsTypes> UninitializedIpfs<Types> {
 }
 
 impl<Types: IpfsTypes> Ipfs<Types> {
+    /// Returns the controls in IPFS.
+    pub fn controls(&self) -> Controls<Types> { self.controls.clone() }
+
     /// Return an [`IpldDag`] for DAG operations
     pub fn dag(&self) -> IpldDag<Types> {
         IpldDag::new(self.clone())
@@ -1027,6 +1021,21 @@ impl<Types: IpfsTypes> Ipfs<Types> {
         self.controls.swarm().close().await;
         // TODO: close pubsub mdns...
     }
+
+
+    pub async fn run_cli(mut self) {
+        let mut app = App::new("xCLI");
+
+        app.add_subcommand_with_userdata(ipfs_cli_commands(), Box::new(self.clone()));
+
+        app.add_subcommand_with_userdata(swarm_cli_commands(), Box::new(self.controls.swarm().clone()));
+        app.add_subcommand_with_userdata(dht_cli_commands(), Box::new(self.controls.kad().clone()));
+
+        app.run();
+
+        self.exit_daemon().await;
+    }
+
 }
 
 /// Bitswap statistics
@@ -1083,6 +1092,10 @@ use crate::p2p::Controls;
 use std::convert::TryFrom;
 use libp2p_rs::floodsub::Topic;
 use libp2p_rs::floodsub::subscription::Subscription;
+use libp2p_rs::xcli::App;
+use libp2p_rs::swarm::cli::swarm_cli_commands;
+use libp2p_rs::kad::cli::dht_cli_commands;
+use crate::cli::ipfs_cli_commands;
 
 /// Node module provides an easy to use interface used in `tests/`.
 mod node {

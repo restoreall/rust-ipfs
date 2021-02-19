@@ -2,7 +2,7 @@ use crate::cli::handler;
 use cid::Cid;
 use futures::executor;
 use std::convert::TryFrom;
-use xcli::*;
+use libp2p_rs::xcli::*;
 
 pub(crate) fn cli_dag_commands<'a>() -> Command<'a> {
     let get_dag_cmd = Command::new_with_alias("get", "g")

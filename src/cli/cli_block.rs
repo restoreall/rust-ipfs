@@ -3,7 +3,7 @@ use cid::Cid;
 use futures::executor;
 use multihash::Sha2_256;
 use std::convert::TryFrom;
-use xcli::*;
+use libp2p_rs::xcli::*;
 
 pub(crate) fn cli_block_commands<'a>() -> Command<'a> {
     let get_block_cmd = Command::new_with_alias("get", "g")

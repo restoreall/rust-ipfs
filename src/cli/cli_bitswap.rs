@@ -2,7 +2,7 @@ use crate::cli::handler;
 use futures::executor;
 use libp2p_rs::core::PeerId;
 use std::str::FromStr;
-use xcli::*;
+use libp2p_rs::xcli::*;
 
 pub(crate) fn cli_bitswap_commands<'a>() -> Command<'a> {
     let wl_cmd = Command::new_with_alias("wantlist", "w")

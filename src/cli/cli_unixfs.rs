@@ -9,8 +9,8 @@ use std::fs::{DirBuilder, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::exit;
-use xcli::XcliError::BadArgument;
-use xcli::*;
+use libp2p_rs::xcli::*;
+use libp2p_rs::xcli::XcliError::BadArgument;
 
 pub(crate) fn cli_add_commands<'a>() -> Command<'a> {
     Command::new_with_alias("add", "a")

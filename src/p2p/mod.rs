@@ -1,16 +1,16 @@
 //! P2P handling for IPFS nodes.
-use crate::repo::Repo;
-use crate::{IpfsOptions, IpfsTypes, Cid};
-use std::io;
 use std::time::Duration;
 use std::sync::Arc;
+use std::error::Error;
 use tracing::Span;
+
+use crate::repo::Repo;
+use crate::{IpfsOptions, IpfsTypes, Cid};
 
 pub(crate) mod addr;
 pub(crate) mod pubsub;
 mod swarm;
 
-use std::error::Error;
 
 
 pub use addr::{MultiaddrWithPeerId, MultiaddrWithoutPeerId};
@@ -18,7 +18,7 @@ pub use {swarm::Connection};
 use libp2p_rs::core::identity::Keypair;
 use libp2p_rs::core::{Multiaddr, PeerId, ProtocolId};
 
-use libp2p_rs::swarm::{Control as SwarmControl, Swarm, SwarmError};
+use libp2p_rs::swarm::{Control as SwarmControl, Swarm};
 use libp2p_rs::kad::Control as KadControl;
 use libp2p_rs::mdns::control::Control as MdnsControl;
 use libp2p_rs::floodsub::control::Control as FloodsubControl;
@@ -70,6 +70,8 @@ impl<Types: IpfsTypes> Clone for Controls<Types> {
 pub struct SwarmOptions {
     /// The keypair for the PKI based identity of the local node.
     pub keypair: Keypair,
+    /// Bound listening addresses; by default the node will not listen on any address.
+    pub listening_addrs: Vec<Multiaddr>,
     /// The peers to connect to on startup.
     pub bootstrap: Vec<(Multiaddr, PeerId)>,
     /// Enables mdns for peer discovery and announcement when true.
@@ -81,12 +83,14 @@ pub struct SwarmOptions {
 impl From<&IpfsOptions> for SwarmOptions {
     fn from(options: &IpfsOptions) -> Self {
         let keypair = options.keypair.clone();
+        let listening_addrs = options.listening_addrs.clone();
         let bootstrap = options.bootstrap.clone();
         let mdns = options.mdns;
         let kad_protocol = options.kad_protocol.clone();
 
         SwarmOptions {
             keypair,
+            listening_addrs,
             bootstrap,
             mdns,
             kad_protocol,
@@ -114,9 +118,7 @@ pub async fn create_controls<TIpfsTypes: IpfsTypes>(
         .with_ping(PingConfig::new())
         .with_identify(IdentifyConfig::new(false));
 
-    let listen_addr: Multiaddr = "/ip4/0.0.0.0/tcp/8086".parse().unwrap();
-
-    swarm.listen_on(vec![listen_addr]).unwrap();
+    swarm.listen_on(options.listening_addrs).unwrap();
 
     let swarm_control = swarm.control();
 
@@ -164,15 +166,17 @@ pub async fn create_controls<TIpfsTypes: IpfsTypes>(
     // register bitswap into Swarm
     swarm = swarm.with_protocol(Box::new(bitswap.handler()));
 
-        // To start Swarm/Kad/... main loops
+    // To start Swarm/Kad/... main loops
+    swarm.start();
     kad.start(swarm_control.clone());
+    floodsub.start(swarm_control.clone());
+    bitswap.start(swarm_control.clone());
 
+    // handle bootstrap nodes
     for (addr, peer_id) in options.bootstrap {
         kad_control.add_node(peer_id, vec![addr]).await;
     }
     kad_control.bootstrap().await;
-
-    swarm.start();
 
     Controls {
         repo,
@@ -258,98 +262,4 @@ impl<Types: IpfsTypes> Controls<Types> {
     pub fn bitswap(&mut self) -> &mut BitswapControl {
         &mut self.bitswap
     }
-
-    // pub fn get_bootstrappers(&self) -> Vec<Multiaddr> {
-    //     self.swarm
-    //         .bootstrappers
-    //         .iter()
-    //         .cloned()
-    //         .map(|a| a.into())
-    //         .collect()
-    // }
-    //
-    // pub fn add_bootstrapper(
-    //     &mut self,
-    //     addr: MultiaddrWithPeerId,
-    // ) -> Result<Multiaddr, anyhow::Error> {
-    //     let ret = addr.clone().into();
-    //     if self.swarm.bootstrappers.insert(addr.clone()) {
-    //         let MultiaddrWithPeerId {
-    //             multiaddr: ma,
-    //             peer_id,
-    //         } = addr;
-    //         self.kad.add_address(&peer_id, ma.into());
-    //         // the return value of add_address doesn't implement Debug
-    //         trace!(peer_id=%peer_id, "tried to add a bootstrapper");
-    //     }
-    //     Ok(ret)
-    // }
-    //
-    // pub fn remove_bootstrapper(
-    //     &mut self,
-    //     addr: MultiaddrWithPeerId,
-    // ) -> Result<Multiaddr, anyhow::Error> {
-    //     let ret = addr.clone().into();
-    //     if self.swarm.bootstrappers.remove(&addr) {
-    //         let peer_id = addr.peer_id;
-    //         let prefix: Multiaddr = addr.multiaddr.into();
-    //
-    //         if let Some(e) = self.kad.remove_address(&peer_id, &prefix) {
-    //             info!(peer_id=%peer_id, status=?e.status, "removed bootstrapper");
-    //         } else {
-    //             warn!(peer_id=%peer_id, "attempted to remove an unknown bootstrapper");
-    //         }
-    //     }
-    //     Ok(ret)
-    // }
-    //
-    // pub fn clear_bootstrappers(&mut self) -> Vec<Multiaddr> {
-    //     let removed = self.swarm.bootstrappers.drain();
-    //     let mut ret = Vec::with_capacity(removed.len());
-    //
-    //     for addr_with_peer_id in removed {
-    //         let peer_id = &addr_with_peer_id.peer_id;
-    //         let prefix: Multiaddr = addr_with_peer_id.multiaddr.clone().into();
-    //
-    //         if let Some(e) = self.kad.remove_address(peer_id, &prefix) {
-    //             info!(peer_id=%peer_id, status=?e.status, "cleared bootstrapper");
-    //             ret.push(addr_with_peer_id.into());
-    //         } else {
-    //             error!(peer_id=%peer_id, "attempted to clear an unknown bootstrapper");
-    //         }
-    //     }
-    //
-    //     ret
-    // }
-    //
-    // pub fn restore_bootstrappers(&mut self) -> Result<Vec<Multiaddr>, anyhow::Error> {
-    //     let mut ret = Vec::new();
-    //
-    //     for addr in BOOTSTRAP_NODES {
-    //         let addr = addr
-    //             .parse::<MultiaddrWithPeerId>()
-    //             .expect("see test bootstrap_nodes_are_multiaddr_with_peerid");
-    //         if self.swarm.bootstrappers.insert(addr.clone()) {
-    //             let MultiaddrWithPeerId {
-    //                 multiaddr: ma,
-    //                 peer_id,
-    //             } = addr.clone();
-    //
-    //             // this is intentionally the multiaddr without peerid turned into plain multiaddr:
-    //             // libp2p cannot dial addresses which include peerids.
-    //             let ma: Multiaddr = ma.into();
-    //
-    //             // same as with add_bootstrapper: the return value from kad.add_address
-    //             // doesn't implement Debug
-    //             self.kad.add_address(&peer_id, ma.clone());
-    //             trace!(peer_id=%peer_id, "tried to restore a bootstrapper");
-    //
-    //             // report with the peerid
-    //             let reported: Multiaddr = addr.into();
-    //             ret.push(reported);
-    //         }
-    //     }
-    //
-    //     Ok(ret)
-    // }
 }

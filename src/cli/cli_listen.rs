@@ -1,6 +1,6 @@
 use crate::cli::handler;
 use futures::executor;
-use xcli::*;
+use libp2p_rs::xcli::*;
 
 pub(crate) fn cli_listen_commands<'a>() -> Command<'a> {
     let add_cmd = Command::new_with_alias("add", "a")
