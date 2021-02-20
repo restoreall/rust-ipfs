@@ -38,7 +38,7 @@ pub mod unixfs;
 #[macro_use]
 extern crate tracing;
 
-use anyhow::{anyhow, format_err};
+use anyhow::anyhow;
 use cid::Codec;
 use futures::{
     channel::{
@@ -775,16 +775,15 @@ impl<Types: IpfsTypes> Ipfs<Types> {
         self.controls.pubsub().subscribe(Topic::new(topic))
             .instrument(self.span.clone())
             .await
-            .ok_or(anyhow!("subscribe failed"))
+            .map_err(Error::from)
     }
 
     /// Publishes to the topic which may have been subscribed to earlier
     pub async fn pubsub_publish(&mut self, topic: String, data: Vec<u8>) -> Result<(), Error> {
         self.controls.pubsub().publish(Topic::new(topic), data)
             .instrument(self.span.clone())
-            .await;
-
-        Ok(())
+            .await
+            .map_err(Error::from)
     }
 
     // /// Forcibly unsubscribes a previously made [`SubscriptionStream`], which could also be
@@ -814,18 +813,18 @@ impl<Types: IpfsTypes> Ipfs<Types> {
             String::new()
         };
 
-        let peers = self.controls.pubsub().get_peers(Topic::new(topic))
+        self.controls.pubsub().get_peers(Topic::new(topic))
             .instrument(self.span.clone())
-            .await;
-
-        Ok(peers)
+            .await
+            .map_err(Error::from)
     }
 
     /// Returns all currently subscribed topics
     pub async fn pubsub_subscribed(&mut self) -> Result<Vec<String>, Error> {
         let topics = self.controls.pubsub().ls()
             .instrument(self.span.clone())
-            .await;
+            .await
+            .map_err(Error::from)?;
 
         let r = topics.into_iter().map(String::from).collect::<Vec<_>>();
 
@@ -837,82 +836,31 @@ impl<Types: IpfsTypes> Ipfs<Types> {
         &mut self,
         peer: Option<PeerId>,
     ) -> Result<Vec<(Cid, bitswap::Priority)>, Error> {
-        self.controls.bitswap().wantlist()
+        self.controls.bitswap().wantlist(peer)
             .instrument(self.span.clone())
             .await
             .map_err(Error::from)
     }
 
-    // /// Returns a list of local blocks
-    // ///
-    // /// This implementation is subject to change into a stream, which might only include the pinned
-    // /// blocks.
-    // pub async fn refs_local(&self) -> Result<Vec<Cid>, Error> {
-    //     self.repo.list_blocks().instrument(self.span.clone()).await
-    // }
-    //
-    // /// Returns the accumulated bitswap stats
-    // pub async fn bitswap_stats(&self) -> Result<BitswapStats, Error> {
-    //     async move {
-    //         let (tx, rx) = oneshot_channel();
-    //
-    //         self.to_task
-    //             .clone()
-    //             .send(IpfsEvent::BitswapStats(tx))
-    //             .await?;
-    //
-    //         Ok(rx.await?)
-    //     }
-    //     .instrument(self.span.clone())
-    //     .await
-    // }
+    /// Returns the statisctics of bitswap.
+    pub async fn bitswap_stats(
+        &mut self,
+    ) -> Result<BitswapStats, Error> {
+        let stats = self.controls.bitswap().stats()
+            .instrument(self.span.clone())
+            .await
+            .map_err(Error::from)?;
+        let peers = self.controls.bitswap().peers()
+            .instrument(self.span.clone())
+            .await
+            .map_err(Error::from)?;
+        let wantlist = self.controls.bitswap().wantlist(None)
+            .instrument(self.span.clone())
+            .await
+            .map_err(Error::from)?;
 
-    // /// Add a given multiaddr as a listening address. Will fail if the address is unsupported, or
-    // /// if it is already being listened on. Currently will invoke `Swarm::listen_on` internally,
-    // /// keep the ListenerId for later `remove_listening_address` use in a HashMap.
-    // ///
-    // /// The returned future will resolve on the first bound listening address when this is called
-    // /// with `/ip4/0.0.0.0/...` or anything similar which will bound through multiple concrete
-    // /// listening addresses.
-    // ///
-    // /// Trying to add an unspecified listening address while any other listening address adding is
-    // /// in progress will result in error.
-    // ///
-    // /// Returns the bound multiaddress, which in the case of original containing an ephemeral port
-    // /// has now been changed.
-    // pub async fn add_listening_address(&self, addr: Multiaddr) -> Result<Multiaddr, Error> {
-    //     async move {
-    //         let (tx, rx) = oneshot_channel();
-    //
-    //         self.to_task
-    //             .clone()
-    //             .send(IpfsEvent::AddListeningAddress(addr, tx))
-    //             .await?;
-    //
-    //         rx.await?
-    //     }
-    //     .instrument(self.span.clone())
-    //     .await
-    // }
-    //
-    // /// Stop listening on a previously added listening address. Fails if the address is not being
-    // /// listened to.
-    // ///
-    // /// The removal of all listening addresses added through unspecified addresses is not supported.
-    // pub async fn remove_listening_address(&self, addr: Multiaddr) -> Result<(), Error> {
-    //     async move {
-    //         let (tx, rx) = oneshot_channel();
-    //
-    //         self.to_task
-    //             .clone()
-    //             .send(IpfsEvent::RemoveListeningAddress(addr, tx))
-    //             .await?;
-    //
-    //         rx.await?
-    //     }
-    //     .instrument(self.span.clone())
-    //     .await
-    // }
+        Ok(BitswapStats::from((stats, peers, wantlist)))
+    }
 
     /// Obtain the addresses associated with the given `PeerId`; they are first searched for locally
     /// and the DHT is used as a fallback: a `Kademlia::get_closest_peers(peer_id)` query is run and

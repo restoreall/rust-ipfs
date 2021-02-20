@@ -1,10 +1,12 @@
+use cid::Cid;
+use futures::channel::{mpsc, oneshot};
+use futures::SinkExt;
+
+use libp2p_rs::core::PeerId;
+
 use crate::bitswap::ControlCommand;
 use crate::block::Block;
-use cid::Cid;
-use futures::channel::mpsc;
-use futures::channel::oneshot;
-use futures::SinkExt;
-use crate::Priority;
+use crate::{Priority, Stats};
 use crate::error::BitswapError;
 
 #[derive(Clone)]
@@ -24,12 +26,30 @@ impl Control {
         rx.await.unwrap()
     }
 
-    /// Queues the wanted block for all peers.
+    /// Returns the wantlist of local if peer is `None`, or the wantlst of the peer specified.
     ///
     /// A user request
-    pub async fn wantlist(&mut self) -> Result<Vec<(Cid, Priority)>, BitswapError> {
+    pub async fn wantlist(&mut self, peer: Option<PeerId>) -> Result<Vec<(Cid, Priority)>, BitswapError> {
         let (tx, rx) = oneshot::channel();
-        self.0.send(ControlCommand::WantList(tx)).await;
-        rx.await.unwrap()
+        self.0.send(ControlCommand::WantList(peer, tx)).await?;
+        rx.await?
+    }
+
+    /// Returns the connected peers.
+    ///
+    /// A user request
+    pub async fn peers(&mut self) -> Result<Vec<PeerId>, BitswapError> {
+        let (tx, rx) = oneshot::channel();
+        self.0.send(ControlCommand::Peers(tx)).await?;
+        rx.await?
+    }
+
+    /// Returns the bitswap statistics per peer basis.
+    ///
+    /// A user request
+    pub async fn stats(&mut self) -> Result<Stats, BitswapError> {
+        let (tx, rx) = oneshot::channel();
+        self.0.send(ControlCommand::Stats(tx)).await?;
+        rx.await?
     }
 }

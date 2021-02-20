@@ -53,6 +53,13 @@ impl Notifiee for Handler {
             let _ = new_peers.send(PeerEvent::NewPeer(peer_id)).await;
         });
     }
+    fn disconnected(&mut self, conn: &mut Connection) {
+        let peer_id = conn.remote_peer();
+        let mut new_peers = self.new_peer.clone();
+        task::spawn(async move {
+            let _ = new_peers.send(PeerEvent::DeadPeer(peer_id)).await;
+        });
+    }
 }
 
 #[async_trait]
@@ -67,7 +74,7 @@ impl ProtocolHandler for Handler {
             let packet = stream.read_one(MAX_BUF_SIZE).await?;
             let message = Message::from_bytes(&packet)?;
             let peer = stream.remote_peer();
-            self.incoming_tx.send((peer, message)).await;
+            self.incoming_tx.send((peer, message)).await?;
         }
     }
 

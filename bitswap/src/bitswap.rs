@@ -1,3 +1,15 @@
+use std::mem;
+use std::sync::Arc;
+use cid::Cid;
+use futures::channel::{mpsc, oneshot};
+use futures::select;
+use futures::StreamExt;
+use libp2p_rs::core::PeerId;
+use libp2p_rs::runtime::task;
+use libp2p_rs::swarm::Control as SwarmControl;
+use libp2p_rs::traits::WriteEx;
+use std::collections::HashMap;
+
 use crate::block::Block;
 use crate::control::Control;
 use crate::error::BitswapError;
@@ -5,28 +17,18 @@ use crate::ledger::{Ledger, Message, Priority};
 use crate::protocol::{Handler, PeerEvent};
 use crate::stat::Stats;
 use crate::{IBlockStore, BS_PROTO_ID};
-use cid::Cid;
-use futures::channel::{mpsc, oneshot};
-use futures::select;
-use futures::stream::FusedStream;
-use futures::StreamExt;
-use libp2p_rs::core::PeerId;
-use libp2p_rs::runtime::task;
-use libp2p_rs::swarm::Control as Swarm_Control;
-use libp2p_rs::traits::WriteEx;
-use std::collections::HashMap;
-use std::mem;
-use std::sync::Arc;
 
 pub(crate) enum ControlCommand {
     WantBlock(Cid, oneshot::Sender<oneshot::Receiver<Block>>),
     CancelBlock(Cid),
-    WantList(oneshot::Sender<Result<Vec<(Cid, Priority)>>>),
+    WantList(Option<PeerId>, oneshot::Sender<Result<Vec<(Cid, Priority)>>>),
+    Peers(oneshot::Sender<Result<Vec<PeerId>>>),
+    Stats(oneshot::Sender<Result<Stats>>),
 }
 
 pub struct Bitswap {
     // Used to open stream.
-    swarm: Option<Swarm_Control>,
+    swarm: Option<SwarmControl>,
 
     /// block store
     blockstore: IBlockStore,
@@ -86,7 +88,7 @@ impl Bitswap {
     }
 
     /// Start message process loop.
-    pub fn start(mut self, control: Swarm_Control) {
+    pub fn start(mut self, control: SwarmControl) {
         self.swarm = Some(control);
 
         // well, self 'move' explicitly,
@@ -98,52 +100,20 @@ impl Bitswap {
 
     /// Message Process Loop.
     pub async fn process_loop(&mut self) -> Result<()> {
-        let result = self.next().await;
-
-        if !self.peer_rx.is_terminated() {
-            self.peer_rx.close();
-            while self.peer_rx.next().await.is_some() {
-                // just drain
-            }
-        }
-
-        if !self.incoming_rx.is_terminated() {
-            self.incoming_rx.close();
-            while self.incoming_rx.next().await.is_some() {
-                // just drain
-            }
-        }
-
-        if !self.control_rx.is_terminated() {
-            self.control_rx.close();
-            while let Some(cmd) = self.control_rx.next().await {
-                match cmd {
-                    ControlCommand::WantBlock(_, _) => {}
-                    ControlCommand::CancelBlock(_) => {}
-                    ControlCommand::WantList(_) => {}
-                }
-            }
-        }
-
-        result
-    }
-
-    async fn next(&mut self) -> Result<()> {
         loop {
             select! {
                 cmd = self.peer_rx.next() => {
-                    self.handle_peer_event(cmd).await?;
+                    self.handle_peer_event(cmd).await;
                 }
                 msg = self.incoming_rx.next() => {
                     if let Some((source, message)) = msg {
-                        self.handle_incoming_message(source, message).await?;
+                        self.handle_incoming_message(source, message);
                     }
                 }
                 cmd = self.control_rx.next() => {
-                    self.handle_control_command(cmd).await?;
+                    self.handle_control_command(cmd)?;
                 }
             }
-
             self.send_messages().await;
         }
     }
@@ -161,7 +131,7 @@ impl Bitswap {
         }
     }
 
-    async fn handle_peer_event(&mut self, evt: Option<PeerEvent>) -> Result<()> {
+    async fn handle_peer_event(&mut self, evt: Option<PeerEvent>) {
         match evt {
             Some(PeerEvent::NewPeer(p)) => {
                 let ledger = Ledger::new();
@@ -174,14 +144,13 @@ impl Bitswap {
             }
             None => {}
         }
-        Ok(())
     }
 
-    async fn handle_incoming_message(
+    fn handle_incoming_message(
         &mut self,
         source: PeerId,
         mut message: Message,
-    ) -> Result<()> {
+    ) {
         let current_wantlist = self.local_wantlist();
 
         let ledger = self
@@ -211,8 +180,6 @@ impl Bitswap {
         for block in mem::take(&mut message.blocks) {
             self.handle_received_block(block);
         }
-
-        Ok(())
     }
 
     fn handle_received_block(&mut self, block: Block) {
@@ -230,7 +197,7 @@ impl Bitswap {
         }
     }
 
-    async fn handle_control_command(&mut self, cmd: Option<ControlCommand>) -> Result<()> {
+    fn handle_control_command(&mut self, cmd: Option<ControlCommand>) -> Result<()> {
         match cmd {
             Some(ControlCommand::WantBlock(cid, reply)) => {
                 let (tx, rx) = oneshot::channel();
@@ -238,11 +205,29 @@ impl Bitswap {
                 let _ = reply.send(rx);
             }
             Some(ControlCommand::CancelBlock(cid)) => self.cancel_block(&cid),
-            Some(ControlCommand::WantList(reply)) => {
-                let list = self.local_wantlist().into_iter().map(|cid| (cid, 1)).collect();
-                let _ = reply.send(Ok(list));
+            Some(ControlCommand::WantList(peer, reply)) => {
+                if let Some(peer_id) = peer {
+                    let list = self.peer_wantlist(&peer_id)
+                        .unwrap_or_default();
+                    let _ = reply.send(Ok(list));
+                } else {
+                    let list = self.local_wantlist()
+                        .into_iter()
+                        .map(|cid| (cid, 1))
+                        .collect();
+                    let _ = reply.send(Ok(list));
+                }
             },
-            None => {}
+            Some(ControlCommand::Peers(reply)) => {
+                let _ = reply.send(Ok(self.peers()));
+            },
+            Some(ControlCommand::Stats(reply)) => {
+                let _ = reply.send(Ok(self.stats()));
+            },
+            None => {
+                // control channel closed, exit the main loop
+                return Err(BitswapError::Closing);
+            }
         }
         Ok(())
     }
@@ -270,12 +255,32 @@ impl Bitswap {
         self.wanted_blocks.remove(cid);
     }
 
-    /// Return the wantlist of the local node
+    /// Returns the wantlist of a peer, if known
+    pub fn peer_wantlist(&self, peer: &PeerId) -> Option<Vec<(Cid, Priority)>> {
+        self.connected_peers.get(peer).map(Ledger::wantlist)
+    }
+
+    /// Returns the wantlist of the local node
     pub fn local_wantlist(&self) -> Vec<Cid> {
         self.wanted_blocks
             .iter()
             .map(|(cid, _)| cid.clone())
             .collect()
+    }
+
+    /// Returns the connected peers.
+    pub fn peers(&self) -> Vec<PeerId> {
+        self.connected_peers.keys().cloned().collect()
+    }
+
+    /// Returns the statistics of bitswap.
+    pub fn stats(&self) -> Stats {
+        self.stats
+            .values()
+            .fold(Stats::default(), |acc, peer_stats| {
+                acc.add_assign(&peer_stats);
+                acc
+            })
     }
 
     /// Sends the wantlist to the peer.
@@ -295,7 +300,7 @@ impl Bitswap {
     }
 }
 
-async fn send_message(swarm: &mut Option<Swarm_Control>, peer_id: PeerId, message: Message) {
+async fn send_message(swarm: &mut Option<SwarmControl>, peer_id: PeerId, message: Message) {
     // send meaasge
     let stream = swarm
         .as_mut()
