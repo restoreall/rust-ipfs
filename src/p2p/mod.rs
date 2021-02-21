@@ -1,7 +1,5 @@
 //! P2P handling for IPFS nodes.
 use std::time::Duration;
-use std::sync::Arc;
-use std::error::Error;
 
 use crate::repo::Repo;
 use crate::{IpfsOptions, IpfsTypes, Cid};
@@ -14,14 +12,15 @@ mod swarm;
 
 pub use addr::{MultiaddrWithPeerId, MultiaddrWithoutPeerId};
 pub use {swarm::Connection};
+
 use libp2p_rs::core::identity::Keypair;
 use libp2p_rs::core::{Multiaddr, PeerId, ProtocolId};
 
 use libp2p_rs::swarm::{Control as SwarmControl, Swarm};
 use libp2p_rs::kad::Control as KadControl;
-use libp2p_rs::mdns::control::Control as MdnsControl;
+//use libp2p_rs::mdns::control::Control as MdnsControl;
 use libp2p_rs::floodsub::control::Control as FloodsubControl;
-use bitswap::{Control as BitswapControl, BlockStore, Block};
+use bitswap::Control as BitswapControl;
 
 use libp2p_rs::kad::store::MemoryStore;
 
@@ -36,11 +35,11 @@ use libp2p_rs::{noise, yamux, mplex, secio};
 use libp2p_rs::core::upgrade::Selector;
 use libp2p_rs::core::transport::upgrade::TransportUpgrade;
 use libp2p_rs::tcp::TcpConfig;
-use libp2p_rs::dns::DnsConfig;
+//use libp2p_rs::dns::DnsConfig;
 
 /// Libp2p Network controllers.
 pub struct Controls<Types: IpfsTypes> {
-    repo: Arc<Repo<Types>>,
+    repo: Repo<Types>,
 
     swarm: SwarmControl,
     kad: KadControl,
@@ -100,7 +99,7 @@ impl From<&IpfsOptions> for SwarmOptions {
 /// Creates a new IPFS swarm.
 pub async fn create_controls<TIpfsTypes: IpfsTypes>(
     options: SwarmOptions,
-    repo: Arc<Repo<TIpfsTypes>>,
+    repo: Repo<TIpfsTypes>,
 ) -> Controls<TIpfsTypes> {
     let sec_secio = secio::Config::new(options.keypair.clone());
     // Set up an encrypted TCP transport over the Yamux or Mplex protocol.
@@ -154,14 +153,7 @@ pub async fn create_controls<TIpfsTypes: IpfsTypes>(
     swarm = swarm.with_protocol(Box::new(floodsub.handler()));
 
     // bitswap
-    struct TestRepo;
-    impl BlockStore for TestRepo {
-        fn get(&self, cid: &Cid) -> Result<Option<Block>, Box<dyn Error>> {
-            Ok(None)
-        }
-    }
-
-    let bitswap = Bitswap::new(Box::new(TestRepo));
+    let bitswap = Bitswap::new(repo.clone());
     let bitswap_control = bitswap.control();
 
     // register bitswap into Swarm

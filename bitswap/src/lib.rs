@@ -7,11 +7,9 @@ mod prefix;
 mod protocol;
 mod stat;
 
-use cid::Cid;
-use std::error::Error;
-
 pub use bitswap::Bitswap;
 pub use block::Block;
+pub use block::BsBlockStore;
 pub use control::Control;
 pub use ledger::Priority;
 pub use stat::Stats;
@@ -24,15 +22,15 @@ mod bitswap_pb {
     include!(concat!(env!("OUT_DIR"), "/bitswap_pb.rs"));
 }
 
-/// This API is being discussed and evolved, which will likely lead to breakage.
-// FIXME: why is this unpin? doesn't probably need to be since all of the futures are Box::pin'd.
-pub trait BlockStore {
-    /// Returns a block from the blockstore.
-    fn get(&self, cid: &Cid) -> Result<Option<Block>, Box<dyn Error>>;
-}
-
-pub type IBlockStore = Box<dyn BlockStore + Send + Sync>;
-
+// /// This API is being discussed and evolved, which will likely lead to breakage.
+// // FIXME: why is this unpin? doesn't probably need to be since all of the futures are Box::pin'd.
+// pub trait BlockStore {
+//     /// Returns a block from the blockstore.
+//     fn get(&self, cid: &Cid) -> Result<Option<Block>, Box<dyn Error>>;
+// }
+//
+// pub type IBlockStore = Box<dyn BlockStore + Send + Sync>;
+//
 #[cfg(test)]
 mod tests {
     #[test]

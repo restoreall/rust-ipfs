@@ -1,4 +1,8 @@
 use cid::Cid;
+use std::fmt::Debug;
+use std::error::Error;
+
+use async_trait::async_trait;
 
 /// An Ipfs block consisting of a [`Cid`] and the bytes of the block.
 ///
@@ -36,4 +40,19 @@ impl Block {
     pub fn into_vec(self) -> Vec<u8> {
         self.data.into()
     }
+}
+
+/// BlockStore TRait used by Bitswap.
+#[async_trait]
+pub trait BsBlockStore: Send + Sync + Unpin + 'static {
+    /// Returns whether a block is present in the blockstore.
+    async fn contains(&self, cid: &Cid) -> Result<bool, Box<dyn Error>>;
+    /// Returns a block from the blockstore.
+    async fn get(&self, cid: &Cid) -> Result<Option<Block>, Box<dyn Error>>;
+    /// Inserts a block in the blockstore.
+    async fn put(&self, block: Block) -> Result<Cid, Box<dyn Error>>;
+    /// Removes a block from the blockstore.
+    async fn remove(&self, cid: &Cid) -> Result<(), Box<dyn Error>>;
+    // /// Returns a list of the blocks (Cids), in the blockstore.
+    // async fn list(&self) -> Result<Vec<Cid>, Error>;
 }

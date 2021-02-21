@@ -1,14 +1,15 @@
 use std::mem;
 use std::sync::Arc;
+use std::collections::HashMap;
 use cid::Cid;
 use futures::channel::{mpsc, oneshot};
 use futures::select;
 use futures::StreamExt;
+
 use libp2p_rs::core::PeerId;
 use libp2p_rs::runtime::task;
 use libp2p_rs::swarm::Control as SwarmControl;
 use libp2p_rs::traits::WriteEx;
-use std::collections::HashMap;
 
 use crate::block::Block;
 use crate::control::Control;
@@ -16,22 +17,22 @@ use crate::error::BitswapError;
 use crate::ledger::{Ledger, Message, Priority};
 use crate::protocol::{Handler, PeerEvent};
 use crate::stat::Stats;
-use crate::{IBlockStore, BS_PROTO_ID};
+use crate::{BS_PROTO_ID, BsBlockStore};
 
 pub(crate) enum ControlCommand {
-    WantBlock(Cid, oneshot::Sender<oneshot::Receiver<Block>>),
-    CancelBlock(Cid),
+    WantBlock(Cid, oneshot::Sender<Result<Block>>),
+    CancelBlock(Cid, oneshot::Sender<Result<()>>),
     WantList(Option<PeerId>, oneshot::Sender<Result<Vec<(Cid, Priority)>>>),
     Peers(oneshot::Sender<Result<Vec<PeerId>>>),
     Stats(oneshot::Sender<Result<Stats>>),
 }
 
-pub struct Bitswap {
+pub struct Bitswap<TBlockStore> {
     // Used to open stream.
     swarm: Option<SwarmControl>,
 
     /// block store
-    blockstore: IBlockStore,
+    blockstore: TBlockStore,
 
     // New peer is connected or peer is dead.
     peer_tx: mpsc::UnboundedSender<PeerEvent>,
@@ -46,7 +47,9 @@ pub struct Bitswap {
     control_rx: mpsc::UnboundedReceiver<ControlCommand>,
 
     /// Wanted blocks
-    wanted_blocks: HashMap<Cid, Vec<oneshot::Sender<Block>>>,
+    ///
+    /// The oneshot::Sender is used to send the block back to the API users.
+    wanted_blocks: HashMap<Cid, Vec<oneshot::Sender<Result<Block>>>>,
 
     /// Ledger
     connected_peers: HashMap<PeerId, Ledger>,
@@ -57,8 +60,8 @@ pub struct Bitswap {
 
 type Result<T> = std::result::Result<T, BitswapError>;
 
-impl Bitswap {
-    pub fn new(blockstore: IBlockStore) -> Self {
+impl<TBlockStore: BsBlockStore> Bitswap<TBlockStore> {
+    pub fn new(blockstore: TBlockStore) -> Self {
         let (peer_tx, peer_rx) = mpsc::unbounded();
         let (incoming_tx, incoming_rx) = mpsc::unbounded();
         let (control_tx, control_rx) = mpsc::unbounded();
@@ -107,7 +110,7 @@ impl Bitswap {
                 }
                 msg = self.incoming_rx.next() => {
                     if let Some((source, message)) = msg {
-                        self.handle_incoming_message(source, message);
+                        self.handle_incoming_message(source, message).await;
                     }
                 }
                 cmd = self.control_rx.next() => {
@@ -146,7 +149,7 @@ impl Bitswap {
         }
     }
 
-    fn handle_incoming_message(
+    async fn handle_incoming_message(
         &mut self,
         source: PeerId,
         mut message: Message,
@@ -156,7 +159,7 @@ impl Bitswap {
         let ledger = self
             .connected_peers
             .get_mut(&source)
-            .expect("Peer not in ledger?!");
+            .expect("Peer without ledger?!");
 
         // Process the incoming cancel list.
         for cid in message.cancel() {
@@ -170,7 +173,7 @@ impl Bitswap {
             .filter(|&(cid, _)| !current_wantlist.iter().map(|c| c).any(|c| c == cid))
         {
             ledger.received_want_list.insert(cid.to_owned(), *priority);
-            if let Ok(Some(block)) = self.blockstore.get(cid) {
+            if let Ok(Some(block)) = self.blockstore.get(cid).await {
                 ledger.add_block(block);
             }
         }
@@ -183,11 +186,11 @@ impl Bitswap {
     }
 
     fn handle_received_block(&mut self, block: Block) {
-        // publish block to all subscribers
+        // publish block to all pending API users
         self.wanted_blocks.remove(&block.cid).map(|txs| {
             txs.into_iter().for_each(|tx| {
                 // some tx may be dropped, regardless
-                let _ = tx.send(block.clone());
+                let _ = tx.send(Ok(block.clone()));
             })
         });
 
@@ -200,11 +203,11 @@ impl Bitswap {
     fn handle_control_command(&mut self, cmd: Option<ControlCommand>) -> Result<()> {
         match cmd {
             Some(ControlCommand::WantBlock(cid, reply)) => {
-                let (tx, rx) = oneshot::channel();
-                self.want_block(cid, 1, tx);
-                let _ = reply.send(rx);
+                self.want_block(cid, 1, reply);
             }
-            Some(ControlCommand::CancelBlock(cid)) => self.cancel_block(&cid),
+            Some(ControlCommand::CancelBlock(cid, reply)) => {
+                self.cancel_block(&cid, reply)
+            },
             Some(ControlCommand::WantList(peer, reply)) => {
                 if let Some(peer_id) = peer {
                     let list = self.peer_wantlist(&peer_id)
@@ -231,13 +234,11 @@ impl Bitswap {
         }
         Ok(())
     }
-}
 
-impl Bitswap {
     /// Queues the wanted block for all peers.
     ///
     /// A user request
-    pub fn want_block(&mut self, cid: Cid, priority: Priority, tx: oneshot::Sender<Block>) {
+    pub fn want_block(&mut self, cid: Cid, priority: Priority, tx: oneshot::Sender<Result<Block>>) {
         for (_peer_id, ledger) in self.connected_peers.iter_mut() {
             ledger.want_block(&cid, priority);
         }
@@ -248,11 +249,12 @@ impl Bitswap {
     ///
     /// Can be either a user request or be called when the block
     /// was received.
-    pub fn cancel_block(&mut self, cid: &Cid) {
+    pub fn cancel_block(&mut self, cid: &Cid, tx: oneshot::Sender<Result<()>>) {
         for (_peer_id, ledger) in self.connected_peers.iter_mut() {
             ledger.cancel_block(cid);
         }
         self.wanted_blocks.remove(cid);
+        let _ = tx.send(Ok(()));
     }
 
     /// Returns the wantlist of a peer, if known

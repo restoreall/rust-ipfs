@@ -17,13 +17,29 @@ impl Control {
         Control(tx)
     }
 
+    /// Closes the bitswap main loop.
+    pub async fn close(&mut self) {
+        // simply close the tx, then exit the main loop
+        // TODO: wait for the main loop to exit before returning
+        self.0.close_channel();
+    }
+
     /// Queues the wanted block for all peers.
     ///
     /// A user request
-    pub async fn want_block(&mut self, cid: Cid, _priority: Priority) -> oneshot::Receiver<Block> {
+    pub async fn want_block(&mut self, cid: Cid, _priority: Priority) -> Result<Block, BitswapError> {
         let (tx, rx) = oneshot::channel();
-        self.0.send(ControlCommand::WantBlock(cid, tx)).await;
-        rx.await.unwrap()
+        self.0.send(ControlCommand::WantBlock(cid, tx)).await?;
+        rx.await?
+    }
+
+    /// Cancels the wanted block.
+    ///
+    /// A user request
+    pub async fn cancel_block(&mut self, cid: Cid) -> Result<(), BitswapError> {
+        let (tx, rx) = oneshot::channel();
+        self.0.send(ControlCommand::CancelBlock(cid, tx)).await?;
+        rx.await?
     }
 
     /// Returns the wantlist of local if peer is `None`, or the wantlst of the peer specified.

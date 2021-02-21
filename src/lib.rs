@@ -56,7 +56,7 @@ use std::{
     future::Future,
     ops::{Deref, DerefMut, Range},
     path::PathBuf,
-    sync::{atomic::Ordering, Arc},
+    sync::atomic::Ordering,
 };
 
 use self::{
@@ -78,6 +78,7 @@ pub use self::{
 };
 pub use cid::Cid;
 pub use bitswap::Block;
+pub use bitswap::BsBlockStore;
 
 pub use libp2p_rs::{
     core::{
@@ -241,7 +242,7 @@ impl<I: Borrow<Keypair>> DebuggableKeypair<I> {
 /// The facade is created through [`UninitializedIpfs`] which is configured with [`IpfsOptions`].
 pub struct Ipfs<Types: IpfsTypes> {
     span: Span,
-    repo: Arc<Repo<Types>>,
+    repo: Repo<Types>,
     keys: DebuggableKeypair<Keypair>,
     controls: Controls<Types>,
 }
@@ -250,7 +251,7 @@ impl<Types: IpfsTypes> Clone for Ipfs<Types> {
     fn clone(&self) -> Self {
         Ipfs {
             span: self.span.clone(),
-            repo: Arc::clone(&self.repo),
+            repo: self.repo.clone(),
             keys: self.keys.clone(),
             controls: self.controls.clone(),
         }
@@ -321,7 +322,7 @@ impl<Types: IpfsTypes> Clone for Ipfs<Types> {
 
 /// Configured Ipfs which can only be started.
 pub struct UninitializedIpfs<Types: IpfsTypes> {
-    repo: Arc<Repo<Types>>,
+    repo: Repo<Types>,
     keys: Keypair,
     options: IpfsOptions,
     repo_events: Receiver<RepoEvent>,
@@ -340,7 +341,7 @@ impl<Types: IpfsTypes> UninitializedIpfs<Types> {
         let keys = options.keypair.clone();
 
         UninitializedIpfs {
-            repo: Arc::new(repo),
+            repo,
             keys,
             options,
             repo_events,
@@ -400,11 +401,12 @@ impl<Types: IpfsTypes> UninitializedIpfs<Types> {
                 match repo_events.next().await {
                     Some(evt) => {
                         match evt {
-                            RepoEvent::WantBlock(cid, _reply) => {
-                                let b = bitswap.want_block(cid, 1).await;
+                            RepoEvent::WantBlock(cid, reply) => {
+                                let b = bitswap.want_block(cid, 1).await.map_err(Error::from);
+                                let _ = reply.send(b);
                             },
                             RepoEvent::UnwantBlock(cid) => {
-                                //bitswap.cancel_block(&cid)
+                                bitswap.cancel_block(cid).await.map_err(Error::from);
                             },
                             RepoEvent::NewBlock(cid, ret) => {
                                 // TODO: consider if cancel is applicable in cases where we provide the
@@ -964,6 +966,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
 
         self.controls.kad().close().await;
         self.controls.swarm().close().await;
+        self.controls.bitswap().close().await;
         // TODO: close pubsub mdns...
     }
 

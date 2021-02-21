@@ -1,7 +1,7 @@
 //! Storage implementation(s) backing the [`crate::Ipfs`].
 use crate::error::Error;
 use crate::path::IpfsPath;
-use crate::{Block, IpfsOptions};
+use crate::{Block, IpfsOptions, BsBlockStore};
 use async_trait::async_trait;
 use cid::{self, Cid};
 use core::fmt::Debug;
@@ -48,7 +48,7 @@ impl From<&IpfsOptions> for RepoOptions {
     }
 }
 
-/// Convenience for creating a new `Repo` from the `RepoOptions`.
+/// Convenience for creating a new `RepoBase` from the `RepoOptions`.
 pub fn create_repo<TRepoTypes: RepoTypes>(
     options: RepoOptions,
 ) -> (Repo<TRepoTypes>, Receiver<RepoEvent>) {
@@ -317,15 +317,23 @@ impl<C: Borrow<Cid>> PinKind<C> {
     }
 }
 
-/// Describes a repo.
+/// Describes a repo base.
 ///
 /// Consolidates a blockstore, a datastore and a subscription registry.
 #[derive(Debug)]
-pub struct Repo<TRepoTypes: RepoTypes> {
+pub struct Repo<T: RepoTypes>(Arc<RepoBase<T>>);
+
+impl<T: RepoTypes> Clone for Repo<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+#[derive(Debug)]
+struct RepoBase<TRepoTypes: RepoTypes> {
     block_store: TRepoTypes::TBlockStore,
     data_store: TRepoTypes::TDataStore,
     events: Sender<RepoEvent>,
-    //pub(crate) subscriptions: SubscriptionRegistry<Block, String>,
     lockfile: Arc<Mutex<TRepoTypes::TLock>>,
 }
 
@@ -372,31 +380,31 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
         let (sender, receiver) = channel(1);
 
         (
-            Repo {
+            Repo(Arc::new(RepoBase {
                 block_store,
                 data_store,
                 events: sender,
                 lockfile: Arc::new(Mutex::new(lockfile)),
-            },
+            })),
             receiver,
         )
     }
 
     /// Shutdowns the repo, closes the repo event sender.
     pub fn shutdown(&self) {
-        self.events.clone().close_channel();
+        self.0.events.clone().close_channel();
     }
 
     pub async fn init(&self) -> Result<(), Error> {
         // Dropping the guard (even though not strictly necessary to compile) to avoid potential
-        // deadlocks if `block_store` or `data_store` were to try to access `Repo.lockfile`.
+        // deadlocks if `block_store` or `data_store` were to try to access `RepoBase.lockfile`.
         {
-            let mut guard = self.lockfile.lock().unwrap();
+            let mut guard = self.0.lockfile.lock().unwrap();
             guard.try_exclusive()?;
         }
 
-        let f1 = self.block_store.init();
-        let f2 = self.data_store.init();
+        let f1 = self.0.block_store.init();
+        let f2 = self.0.data_store.init();
         let (r1, r2) = futures::future::join(f1, f2).await;
         if r1.is_err() {
             r1
@@ -406,8 +414,8 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
     }
 
     pub async fn open(&self) -> Result<(), Error> {
-        let f1 = self.block_store.open();
-        let f2 = self.data_store.open();
+        let f1 = self.0.block_store.open();
+        let f2 = self.0.data_store.open();
         let (r1, r2) = futures::future::join(f1, f2).await;
         if r1.is_err() {
             r1
@@ -419,7 +427,7 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
     /// Puts a block into the block store.
     pub async fn put_block(&self, block: Block) -> Result<(Cid, BlockPut), Error> {
         let cid = block.cid.clone();
-        let (_cid, res) = self.block_store.put(block.clone()).await?;
+        let (_cid, res) = self.0.block_store.put(block.clone()).await?;
 
         // FIXME: this doesn't cause actual DHT providing yet, only some
         // bitswap housekeeping; we might want to not ignore the channel
@@ -430,7 +438,7 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
             // and that is okay with us.
             let (tx, rx) = oneshot::channel();
 
-            self.events
+            self.0.events
                 .clone()
                 .send(RepoEvent::NewBlock(cid.clone(), tx))
                 .await
@@ -456,7 +464,7 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
         } else {
             // TODO: WantBlock
             let (tx, rx) = oneshot::channel();
-            self.events
+            self.0.events
                 .clone()
                 .send(RepoEvent::WantBlock(cid.to_owned(), tx))
                 .await
@@ -467,12 +475,12 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
 
     /// Retrieves a block from the block store if it's available locally.
     pub async fn get_block_now(&self, cid: &Cid) -> Result<Option<Block>, Error> {
-        self.block_store.get(&cid).await
+        self.0.block_store.get(&cid).await
     }
 
     /// Lists the blocks in the blockstore.
     pub async fn list_blocks(&self) -> Result<Vec<Cid>, Error> {
-        self.block_store.list().await
+        self.0.block_store.list().await
     }
 
     /// Remove block from the block store.
@@ -485,11 +493,11 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
         // I like this pattern of the repo abstraction being some sort of
         // "clearing house" for the underlying result enums, but this
         // could potentially be pushed out out of here up to Ipfs, idk
-        match self.block_store.remove(&cid).await? {
+        match self.0.block_store.remove(&cid).await? {
             Ok(success) => match success {
                 BlockRm::Removed(_cid) => {
                     // sending only fails if the background task has exited
-                    self.events
+                    self.0.events
                         .clone()
                         .send(RepoEvent::RemovedBlock(cid.clone()))
                         .await
@@ -507,7 +515,7 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
     pub async fn get_ipns(&self, ipns: &PeerId) -> Result<Option<IpfsPath>, Error> {
         use std::str::FromStr;
 
-        let data_store = &self.data_store;
+        let data_store = &self.0.data_store;
         let key = ipns.to_owned();
         // FIXME: needless vec<u8> creation
         let bytes = data_store.get(Column::Ipns, &key.to_bytes()[..]).await?;
@@ -526,7 +534,7 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
         let string = path.to_string();
         let value = string.as_bytes();
         // FIXME: needless vec<u8> creation
-        self.data_store
+        self.0.data_store
             .put(Column::Ipns, &ipns.to_bytes()[..], value)
             .await
     }
@@ -535,42 +543,42 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
     pub async fn remove_ipns(&self, ipns: &PeerId) -> Result<(), Error> {
         // FIXME: us needing to clone the peerid is wasteful to pass it as a reference only to be
         // cloned again
-        self.data_store
+        self.0.data_store
             .remove(Column::Ipns, &ipns.to_bytes()[..])
             .await
     }
 
     /// Inserts a direct pin for a `Cid`.
     pub async fn insert_direct_pin(&self, cid: &Cid) -> Result<(), Error> {
-        self.data_store.insert_direct_pin(cid).await
+        self.0.data_store.insert_direct_pin(cid).await
     }
 
     /// Inserts a recursive pin for a `Cid`.
     pub async fn insert_recursive_pin(&self, cid: &Cid, refs: References<'_>) -> Result<(), Error> {
-        self.data_store.insert_recursive_pin(cid, refs).await
+        self.0.data_store.insert_recursive_pin(cid, refs).await
     }
 
     /// Removes a direct pin for a `Cid`.
     pub async fn remove_direct_pin(&self, cid: &Cid) -> Result<(), Error> {
-        self.data_store.remove_direct_pin(cid).await
+        self.0.data_store.remove_direct_pin(cid).await
     }
 
     /// Removes a recursive pin for a `Cid`.
     pub async fn remove_recursive_pin(&self, cid: &Cid, refs: References<'_>) -> Result<(), Error> {
         // FIXME: not really sure why is there not an easier way to to transfer control
-        self.data_store.remove_recursive_pin(cid, refs).await
+        self.0.data_store.remove_recursive_pin(cid, refs).await
     }
 
     /// Checks if a `Cid` is pinned.
     pub async fn is_pinned(&self, cid: &Cid) -> Result<bool, Error> {
-        self.data_store.is_pinned(&cid).await
+        self.0.data_store.is_pinned(&cid).await
     }
 
     pub async fn list_pins(
         &self,
         mode: Option<PinMode>,
     ) -> futures::stream::BoxStream<'static, Result<(Cid, PinMode), Error>> {
-        self.data_store.list(mode).await
+        self.0.data_store.list(mode).await
     }
 
     pub async fn query_pins(
@@ -578,6 +586,31 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
         cids: Vec<Cid>,
         requirement: Option<PinMode>,
     ) -> Result<Vec<(Cid, PinKind<Cid>)>, Error> {
-        self.data_store.query(cids, requirement).await
+        self.0.data_store.query(cids, requirement).await
+    }
+}
+
+
+// for bitswap
+#[async_trait]
+impl<TRepoTypes: RepoTypes> BsBlockStore for Repo<TRepoTypes> {
+    async fn contains(&self, cid: &Cid) -> Result<bool, Box<dyn error::Error>> {
+        self.0.block_store.contains(cid).await.map_err(Error::into)
+    }
+
+    async fn get(&self, cid: &Cid) -> Result<Option<Block>, Box<dyn error::Error>> {
+        self.0.block_store.get(cid).await.map_err(Error::into)
+    }
+
+    async fn put(&self, block: Block) -> Result<Cid, Box<dyn error::Error>> {
+        self.0.block_store.put(block).await
+            .map(|r| r.0)
+            .map_err(Error::into)
+    }
+
+    async fn remove(&self, cid: &Cid) -> Result<(), Box<dyn error::Error>> {
+        self.0.block_store.remove(cid).await
+            .and_then(|r| r.map(|_| ()).map_err(|_|Error::msg("BlockRmError")))
+            .map_err(Error::into)
     }
 }
