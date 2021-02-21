@@ -218,9 +218,8 @@ impl<Types: IpfsTypes> Controls<Types> {
     // FIXME: it would be best if get_providers is called only in case the already connected
     // peers don't have it
     pub async fn want_block(&mut self, cid: Cid) {
-        let key = cid.hash().as_bytes().to_owned();
-        self.kad.find_providers(key.into(), 1).await;
-        self.bitswap.want_block(cid, 1).await;
+        let _ = self.kad.find_providers(cid.clone().into(), 1).await;
+        let _ = self.bitswap.want_block(cid, 1).await;
     }
 
     pub async fn stop_providing_block(&mut self, cid: &Cid) {

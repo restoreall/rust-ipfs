@@ -1,34 +1,37 @@
-use crate::ledger::Message;
-use crate::BS_PROTO_ID;
+use std::error::Error;
 use async_trait::async_trait;
 use futures::channel::mpsc;
 use futures::SinkExt;
+
 use libp2p_rs::core::upgrade::UpgradeInfo;
 use libp2p_rs::core::{PeerId, ProtocolId};
-use libp2p_rs::runtime::task;
 use libp2p_rs::swarm::connection::Connection;
+use libp2p_rs::swarm::Control as SwarmControl;
 use libp2p_rs::swarm::protocol_handler::{IProtocolHandler, Notifiee, ProtocolHandler};
 use libp2p_rs::swarm::substream::Substream;
-use libp2p_rs::traits::ReadEx;
-use std::error::Error;
+use libp2p_rs::traits::{ReadEx, WriteEx};
+
+use crate::ledger::Message;
+use crate::{BS_PROTO_ID, Block};
 
 const MAX_BUF_SIZE: usize = 524_288;
 
-pub(crate) enum PeerEvent {
+pub(crate) enum ProtocolEvent {
     NewPeer(PeerId),
     DeadPeer(PeerId),
+    Blocks(PeerId, Vec<Block>),
 }
 
 #[derive(Clone)]
 pub struct Handler {
     incoming_tx: mpsc::UnboundedSender<(PeerId, Message)>,
-    new_peer: mpsc::UnboundedSender<PeerEvent>,
+    new_peer: mpsc::UnboundedSender<ProtocolEvent>,
 }
 
 impl Handler {
     pub(crate) fn new(
         incoming_tx: mpsc::UnboundedSender<(PeerId, Message)>,
-        new_peer: mpsc::UnboundedSender<PeerEvent>,
+        new_peer: mpsc::UnboundedSender<ProtocolEvent>,
     ) -> Self {
         Handler {
             incoming_tx,
@@ -48,17 +51,13 @@ impl UpgradeInfo for Handler {
 impl Notifiee for Handler {
     fn connected(&mut self, conn: &mut Connection) {
         let peer_id = conn.remote_peer();
-        let mut new_peers = self.new_peer.clone();
-        task::spawn(async move {
-            let _ = new_peers.send(PeerEvent::NewPeer(peer_id)).await;
-        });
+        let new_peers = self.new_peer.clone();
+        let _ = new_peers.unbounded_send(ProtocolEvent::NewPeer(peer_id));
     }
     fn disconnected(&mut self, conn: &mut Connection) {
         let peer_id = conn.remote_peer();
-        let mut new_peers = self.new_peer.clone();
-        task::spawn(async move {
-            let _ = new_peers.send(PeerEvent::DeadPeer(peer_id)).await;
-        });
+        let new_peers = self.new_peer.clone();
+        let _ = new_peers.unbounded_send(ProtocolEvent::DeadPeer(peer_id));
     }
 }
 
@@ -81,4 +80,11 @@ impl ProtocolHandler for Handler {
     fn box_clone(&self) -> IProtocolHandler {
         Box::new(self.clone())
     }
+}
+
+// Sends bitswap message to remote peer.
+pub(crate) async fn send_message(mut swarm: SwarmControl, peer_id: PeerId, message: Message) -> Result<(), Box<dyn Error>> {
+    let mut stream = swarm.new_stream(peer_id.clone(), vec![BS_PROTO_ID.into()]).await?;
+    stream.write_one(message.to_bytes().as_ref()).await?;
+    Ok(())
 }

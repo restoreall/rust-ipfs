@@ -44,7 +44,7 @@ impl Block {
 
 /// BlockStore TRait used by Bitswap.
 #[async_trait]
-pub trait BsBlockStore: Send + Sync + Unpin + 'static {
+pub trait BsBlockStore: Clone + Send + Sync + Unpin + 'static {
     /// Returns whether a block is present in the blockstore.
     async fn contains(&self, cid: &Cid) -> Result<bool, Box<dyn Error>>;
     /// Returns a block from the blockstore.

@@ -978,6 +978,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
 
         app.add_subcommand_with_userdata(swarm_cli_commands(), Box::new(self.controls.swarm().clone()));
         app.add_subcommand_with_userdata(dht_cli_commands(), Box::new(self.controls.kad().clone()));
+        app.add_subcommand_with_userdata(bitswap_cli_commands(), Box::new(self.controls.bitswap().clone()));
 
         app.run();
 
@@ -1044,6 +1045,7 @@ use libp2p_rs::xcli::App;
 use libp2p_rs::swarm::cli::swarm_cli_commands;
 use libp2p_rs::kad::cli::dht_cli_commands;
 use crate::cli::ipfs_cli_commands;
+use crate::cli::bitswap_cli_commands;
 
 /// Node module provides an easy to use interface used in `tests/`.
 mod node {
