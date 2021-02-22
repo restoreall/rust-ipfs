@@ -87,6 +87,23 @@ impl Message {
         &self.blocks
     }
 
+    /// Returns the list of blocks.
+    pub fn num_of_blocks(&self) -> usize {
+        self.blocks.len()
+    }
+
+    /// Returns the list of blocks.
+    pub fn bytes_of_blocks(&self) -> usize {
+        self.blocks.iter().fold(0, |acc, block| {
+            acc + block.data.len()
+        })
+    }
+
+    /// Returns the list of blocks, moves ownership.
+    pub fn take_blocks(&mut self) -> Vec<Block> {
+        mem::take(&mut self.blocks)
+    }
+
     /// Returns the list of wanted blocks.
     pub fn want(&self) -> &HashMap<Cid, Priority> {
         &self.want

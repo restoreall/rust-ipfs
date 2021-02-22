@@ -1,4 +1,3 @@
-use std::mem;
 use std::sync::Arc;
 use std::collections::HashMap;
 use cid::Cid;
@@ -106,7 +105,7 @@ impl<TBlockStore: BsBlockStore> Bitswap<TBlockStore> {
 
     fn send_message_to(&mut self, peer_id: PeerId, message: Message) {
         if let Some(peer_stats) = self.stats.get_mut(&peer_id) {
-            peer_stats.update_outgoing(message.blocks.len() as u64);
+            peer_stats.update_outgoing(message.num_of_blocks() as u64, message.bytes_of_blocks() as u64);
         }
 
         // spwan a task to send the message
@@ -115,30 +114,28 @@ impl<TBlockStore: BsBlockStore> Bitswap<TBlockStore> {
             let _ = send_message(swarm, peer_id, message).await;
         });
     }
-    //
-    // async fn send_messages(&mut self) {
-    //     for (peer_id, ledger) in &mut self.connected_peers {
-    //         if let Some(message) = ledger.send() {
-    //             if let Some(peer_stats) = self.stats.get_mut(peer_id) {
-    //                 peer_stats.update_outgoing(message.blocks.len() as u64);
-    //             }
-    //
-    //             // spwan a task to send the message
-    //             let swarm = self.swarm.clone().expect("swarm??");
-    //             let peer_id = *peer_id;
-    //             task::spawn(async move {
-    //                 let _ = send_message(swarm, peer_id, message).await;
-    //             });
-    //             // send meaasge
-    //             // let _ = send_message(self.swarm.clone().unwrap(), peer_id.clone(), message).await;
-    //         }
-    //     }
-    // }
+
+    fn broadcast_messages(&mut self) {
+        for (peer_id, ledger) in &mut self.connected_peers {
+            if let Some(message) = ledger.send() {
+                if let Some(peer_stats) = self.stats.get_mut(peer_id) {
+                    peer_stats.update_outgoing(message.num_of_blocks() as u64, message.bytes_of_blocks() as u64);
+                }
+
+                // spwan a task to send the message
+                let swarm = self.swarm.clone().expect("swarm??");
+                let peer_id = *peer_id;
+                task::spawn(async move {
+                    let _ = send_message(swarm, peer_id, message).await;
+                });
+            }
+        }
+    }
 
     fn handle_event(&mut self, evt: Option<ProtocolEvent>) {
         match evt {
             Some(ProtocolEvent::Blocks(peer, blocks)) => {
-                log::debug!("blockstore reports {} for {:?}", blocks.len(), peer);
+                log::debug!("blockstore reports {} block(s) for {:?}", blocks.len(), peer);
                 let ledger = self
                     .connected_peers
                     .get_mut(&peer)
@@ -171,7 +168,7 @@ impl<TBlockStore: BsBlockStore> Bitswap<TBlockStore> {
         source: PeerId,
         mut message: Message,
     ) {
-        log::debug!("incoming message: from {}, w={} c={} b={}", source,
+        log::debug!("incoming message: from {:?}, w={} c={} b={}", source,
                     message.want().len(), message.cancel().len(), message.blocks().len());
 
         let current_wantlist = self.local_wantlist();
@@ -199,7 +196,7 @@ impl<TBlockStore: BsBlockStore> Bitswap<TBlockStore> {
 
         if to_get.len() > 0 {
             // ask blockstore for the wanted blocks
-            log::debug!("{:?} asking for {} blocks", source, to_get.len());
+            log::debug!("{:?} asking for {} block(s), checking blockstore", source, to_get.len());
             let blockstore = self.blockstore.clone();
             let mut poster = self.peer_tx.clone();
             task::spawn(async move {
@@ -218,51 +215,49 @@ impl<TBlockStore: BsBlockStore> Bitswap<TBlockStore> {
 
         // Process the incoming blocks.
         // TODO: send block to any peer who want
-        for block in mem::take(&mut message.blocks) {
-            self.handle_received_block(source, block);
-        }
+        self.handle_received_blocks(source, message.take_blocks());
     }
 
-    fn handle_received_block(&mut self, source: PeerId, block: Block) {
-        log::debug!("received {:?} from {:?}", block.cid, source);
+    fn handle_received_blocks(&mut self, source: PeerId, blocks: Vec<Block>) {
+        log::debug!("received {} block(s) from {:?}", blocks.len(), source);
 
-        // publish block to all pending API users
-        self.wanted_blocks.remove(&block.cid).map(|txs| {
-            txs.into_iter().for_each(|tx| {
-                // some tx may be dropped, regardless
-                let _ = tx.send(Ok(block.clone()));
-            })
-        });
+        for block in &blocks {
+            // publish block to all pending API users
+            self.wanted_blocks.remove(&block.cid).map(|txs| {
+                txs.into_iter().for_each(|tx| {
+                    // some tx may be dropped, regardless
+                    log::debug!("wake up API client with {:?} from {:?}", block.cid, source);
+                    let _ = tx.send(Ok(block.clone()));
+                })
+            });
 
-        // cancel want
-        for (_peer_id, ledger) in self.connected_peers.iter_mut() {
-            ledger.cancel_block(&block.cid);
+            // cancel want
+            for (_peer_id, ledger) in self.connected_peers.iter_mut() {
+                ledger.cancel_block(&block.cid);
+            }
         }
 
-        // put block onto blockstore
+        // put all blocks onto blockstore
+        // note that 'blocks' are moved into the task
         let blockstore = self.blockstore.clone();
         let peer_stats = Arc::clone(&self.stats.get(&source).unwrap());
         task::spawn(async move {
-            let bytes = block.data().len() as u64;
-            let res = blockstore.put(block.clone()).await;
-            match res {
-                Ok((_, true)) => {
-                    peer_stats.update_incoming_unique(bytes);
-                },
-                Ok((_, false)) => {
-                    peer_stats.update_incoming_duplicate(bytes);
-                },
-                Err(e) => {
-                    log::info!(
-                        "Got block {} from {:?} but failed to store it: {}",
-                        block.cid,
-                        source,
-                        e
-                    );
+            for block in blocks {
+                let bytes = block.data().len() as u64;
+                let res = blockstore.put(block).await;
+                match res {
+                    Ok((_, true)) => {
+                        peer_stats.update_incoming_unique(bytes);
+                    },
+                    Ok((_, false)) => {
+                        peer_stats.update_incoming_duplicate(bytes);
+                    },
+                    Err(e) => {
+                        log::info!("Got block from {:?} but failed to store it: {}", source, e);
+                    }
                 }
-            };
+            }
         });
-
     }
 
     fn handle_control_command(&mut self, cmd: Option<ControlCommand>) -> Result<()> {
@@ -309,6 +304,9 @@ impl<TBlockStore: BsBlockStore> Bitswap<TBlockStore> {
             ledger.want_block(&cid, priority);
         }
         self.wanted_blocks.entry(cid).or_insert(vec![]).push(tx);
+
+        // ask all known peers for the wanted block
+        self.broadcast_messages();
     }
 
     /// Removes the block from our want list and updates all peers.

@@ -12,8 +12,9 @@ pub struct Stats {
 }
 
 impl Stats {
-    pub fn update_outgoing(&self, num_blocks: u64) {
+    pub fn update_outgoing(&self, num_blocks: u64, bytes: u64) {
         self.sent_blocks.fetch_add(num_blocks, Ordering::Relaxed);
+        self.sent_data.fetch_add(bytes, Ordering::Relaxed);
     }
 
     pub fn update_incoming_unique(&self, bytes: u64) {
