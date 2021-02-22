@@ -49,10 +49,9 @@ pub trait BsBlockStore: Clone + Send + Sync + Unpin + 'static {
     async fn contains(&self, cid: &Cid) -> Result<bool, Box<dyn Error>>;
     /// Returns a block from the blockstore.
     async fn get(&self, cid: &Cid) -> Result<Option<Block>, Box<dyn Error>>;
-    /// Inserts a block in the blockstore.
-    async fn put(&self, block: Block) -> Result<Cid, Box<dyn Error>>;
+    /// Inserts a block in the blockstore. bool means it is a new block inserted,
+    /// otherwise, existing block.
+    async fn put(&self, block: Block) -> Result<(Cid, bool), Box<dyn Error>>;
     /// Removes a block from the blockstore.
     async fn remove(&self, cid: &Cid) -> Result<(), Box<dyn Error>>;
-    // /// Returns a list of the blocks (Cids), in the blockstore.
-    // async fn list(&self) -> Result<Vec<Cid>, Error>;
 }

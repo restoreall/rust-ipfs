@@ -602,9 +602,9 @@ impl<TRepoTypes: RepoTypes> BsBlockStore for Repo<TRepoTypes> {
         self.0.block_store.get(cid).await.map_err(Error::into)
     }
 
-    async fn put(&self, block: Block) -> Result<Cid, Box<dyn error::Error>> {
+    async fn put(&self, block: Block) -> Result<(Cid, bool), Box<dyn error::Error>> {
         self.0.block_store.put(block).await
-            .map(|r| r.0)
+            .map(|(cid, put)| (cid, put == BlockPut::NewBlock))
             .map_err(Error::into)
     }
 

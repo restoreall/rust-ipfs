@@ -132,25 +132,25 @@ impl<TBlockStore: BsBlockStore> Bitswap<TBlockStore> {
             let _ = send_message(swarm, peer_id, message).await;
         });
     }
-
-    async fn send_messages(&mut self) {
-        for (peer_id, ledger) in &mut self.connected_peers {
-            if let Some(message) = ledger.send() {
-                if let Some(peer_stats) = self.stats.get_mut(peer_id) {
-                    peer_stats.update_outgoing(message.blocks.len() as u64);
-                }
-
-                // spwan a task to send the message
-                let swarm = self.swarm.clone().expect("swarm??");
-                let peer_id = *peer_id;
-                task::spawn(async move {
-                    let _ = send_message(swarm, peer_id, message).await;
-                });
-                // send meaasge
-                // let _ = send_message(self.swarm.clone().unwrap(), peer_id.clone(), message).await;
-            }
-        }
-    }
+    //
+    // async fn send_messages(&mut self) {
+    //     for (peer_id, ledger) in &mut self.connected_peers {
+    //         if let Some(message) = ledger.send() {
+    //             if let Some(peer_stats) = self.stats.get_mut(peer_id) {
+    //                 peer_stats.update_outgoing(message.blocks.len() as u64);
+    //             }
+    //
+    //             // spwan a task to send the message
+    //             let swarm = self.swarm.clone().expect("swarm??");
+    //             let peer_id = *peer_id;
+    //             task::spawn(async move {
+    //                 let _ = send_message(swarm, peer_id, message).await;
+    //             });
+    //             // send meaasge
+    //             // let _ = send_message(self.swarm.clone().unwrap(), peer_id.clone(), message).await;
+    //         }
+    //     }
+    // }
 
     fn handle_event(&mut self, evt: Option<ProtocolEvent>) {
         match evt {
@@ -236,13 +236,13 @@ impl<TBlockStore: BsBlockStore> Bitswap<TBlockStore> {
         // Process the incoming blocks.
         // TODO: send block to any peer who want
         for block in mem::take(&mut message.blocks) {
-            self.handle_received_block(block);
+            self.handle_received_block(source, block);
         }
-
-        self.send_messages().await;
     }
 
-    fn handle_received_block(&mut self, block: Block) {
+    fn handle_received_block(&mut self, source: PeerId, block: Block) {
+        log::debug!("received {:?} from {:?}", block.cid, source);
+
         // publish block to all pending API users
         self.wanted_blocks.remove(&block.cid).map(|txs| {
             txs.into_iter().for_each(|tx| {
@@ -255,6 +255,31 @@ impl<TBlockStore: BsBlockStore> Bitswap<TBlockStore> {
         for (_peer_id, ledger) in self.connected_peers.iter_mut() {
             ledger.cancel_block(&block.cid);
         }
+
+        // put block onto blockstore
+        let blockstore = self.blockstore.clone();
+        let peer_stats = Arc::clone(&self.stats.get(&source).unwrap());
+        task::spawn(async move {
+            let bytes = block.data().len() as u64;
+            let res = blockstore.put(block.clone()).await;
+            match res {
+                Ok((_, true)) => {
+                    peer_stats.update_incoming_unique(bytes);
+                },
+                Ok((_, false)) => {
+                    peer_stats.update_incoming_duplicate(bytes);
+                },
+                Err(e) => {
+                    log::info!(
+                        "Got block {} from {:?} but failed to store it: {}",
+                        block.cid,
+                        source,
+                        e
+                    );
+                }
+            };
+        });
+
     }
 
     fn handle_control_command(&mut self, cmd: Option<ControlCommand>) -> Result<()> {
