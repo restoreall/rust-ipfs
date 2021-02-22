@@ -63,7 +63,7 @@ fn cli_cat(app: &App, args: &[&str]) -> XcliResult {
 
     executor::block_on(async {
         let stream = ipfs.cat_unixfs(path, None).await.unwrap_or_else(|e| {
-            eprintln!("Error: {:?}", e);
+            println!("Error: {:?}", e);
             exit(1);
         });
 
@@ -77,7 +77,7 @@ fn cli_cat(app: &App, args: &[&str]) -> XcliResult {
                     println!("{:?}", bytes);
                 }
                 Some(Err(e)) => {
-                    eprintln!("Error: {:?}", e);
+                    println!("Error: {:?}", e);
                     exit(1);
                 }
                 None => break,
@@ -121,14 +121,14 @@ fn cli_get(app: &App, args: &[&str]) -> XcliResult {
             let tmp_cid = cid.clone();
 
             let ipld_block = ipfs.get_block(cid).await.unwrap_or_else(|e| {
-                eprintln!("Error in get_block({:?}): {:?}", cid, e);
+                println!("Failed to get block {}: {:?}", cid, e);
                 exit(1);
             });
 
             match walker
                 .next(&ipld_block.into_vec(), &mut cache)
                 .unwrap_or_else(|e| {
-                    eprintln!("Error in walker.next(): {:?}", e);
+                    println!("Error in walker.next(): {:?}", e);
                     exit(1);
                 })
             {
@@ -153,7 +153,7 @@ fn cli_get(app: &App, args: &[&str]) -> XcliResult {
                         same_file = true;
                         let _ = OpenOptions::new().write(true).append(true)
                             .create(true).open(file_name.clone()).unwrap_or_else(|e| {
-                            eprintln!("Error in create file: {:?}", e);
+                            println!("Error in create file: {:?}", e);
                             exit(1);
                         });
                     }
@@ -162,13 +162,13 @@ fn cli_get(app: &App, args: &[&str]) -> XcliResult {
                     if same_file {
                         let mut file = OpenOptions::new().append(true).open(file_name.clone())
                             .map_err(|e| {
-                                eprintln!("Error in open file: {:?}", e);
+                                println!("Error in open file: {:?}", e);
                                 exit(1);
                             })
                             .unwrap();
 
                         file.write_all(segment.as_bytes()).unwrap_or_else(|e| {
-                            eprintln!("Error in write_all: {:?}", e);
+                            println!("Error in write_all: {:?}", e);
                             exit(1);
                         });
                     }
@@ -185,7 +185,7 @@ fn cli_get(app: &App, args: &[&str]) -> XcliResult {
                         root.push(multibase::Base::Base32Upper.encode(tmp_cid.to_bytes()));
                         DirBuilder::new().create(&root)
                             .unwrap_or_else(|e| {
-                                eprintln!("Error in create dir by path empty: {:?}", e);
+                                println!("Error in create dir by path empty: {:?}", e);
                                 exit(1);
                             });
                         println!("Directory: {:?}", &root)
@@ -195,7 +195,7 @@ fn cli_get(app: &App, args: &[&str]) -> XcliResult {
                         root_tmp.push(path);
                         DirBuilder::new().create(&root_tmp)
                             .unwrap_or_else(|e| {
-                                eprintln!("Error in create dir: {:?}", e);
+                                println!("Error in create dir: {:?}", e);
                                 exit(1);
                             });
                         println!("Directory: {:?}", root_tmp)

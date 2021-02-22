@@ -37,8 +37,13 @@ fn cli_get_block(app: &App, args: &[&str]) -> XcliResult {
 
     executor::block_on(async {
         let r = ipfs.get_block(&cid).await;
-        if let Ok(data) = r {
-            println!("{} {:?}", data.cid(), data.data());
+        match r {
+            Ok(data) => {
+                println!("{} {:?}", data.cid(), data.data());
+            }
+            Err(e) => {
+                println!("{:?}", e);
+            }
         }
     });
 
@@ -59,8 +64,11 @@ fn cli_put_block(app: &App, args: &[&str]) -> XcliResult {
     };
 
     executor::block_on(async {
-        let data = ipfs.put_block(block).await;
-        println!("{} {:?}", cid, data);
+        let r = ipfs.put_block(block).await;
+        match r {
+            Ok(cid) => println!("{}", cid),
+            Err(err) => println!("{}", err),
+        }
     });
 
     Ok(CmdExeCode::Ok)

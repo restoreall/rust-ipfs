@@ -9,6 +9,8 @@ pub enum BitswapError {
     Cid(#[from] cid::Error),
     #[error("Closing")]
     Closing,
+    #[error("Timeout")]
+    Timeout,
     #[error("Error sending {0}")]
     Send(#[from] mpsc::SendError),
     #[error("Cancelled oneshot {0}")]
