@@ -141,7 +141,7 @@ pub async fn create_controls<TIpfsTypes: IpfsTypes>(
     let mut kad_control = kad.control();
 
     // update Swarm to support Kad and Routing
-    swarm = swarm.with_protocol(Box::new(kad.handler())).with_routing(Box::new(kad.control()));
+    swarm = swarm.with_protocol(kad).with_routing(Box::new(kad_control.clone()));
 
     let mut floodsub_config = FloodsubConfig::new(swarm.local_peer_id().clone());
     floodsub_config.subscribe_local_messages = true;
@@ -150,20 +150,17 @@ pub async fn create_controls<TIpfsTypes: IpfsTypes>(
     let floodsub_control = floodsub.control();
 
     // register floodsub into Swarm
-    swarm = swarm.with_protocol(Box::new(floodsub.handler()));
+    swarm = swarm.with_protocol(floodsub);
 
     // bitswap
     let bitswap = Bitswap::new(repo.clone());
     let bitswap_control = bitswap.control();
 
     // register bitswap into Swarm
-    swarm = swarm.with_protocol(Box::new(bitswap.handler()));
+    swarm = swarm.with_protocol(bitswap);
 
     // To start Swarm/Kad/... main loops
     swarm.start();
-    kad.start(swarm_control.clone());
-    floodsub.start(swarm_control.clone());
-    bitswap.start(swarm_control.clone());
 
     // handle bootstrap nodes
     for (addr, peer_id) in options.bootstrap {

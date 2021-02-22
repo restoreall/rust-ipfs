@@ -17,6 +17,7 @@ use crate::ledger::{Ledger, Message, Priority};
 use crate::protocol::{Handler, ProtocolEvent, send_message};
 use crate::stat::Stats;
 use crate::BsBlockStore;
+use libp2p_rs::swarm::protocol_handler::{ProtocolImpl, IProtocolHandler};
 
 pub(crate) enum ControlCommand {
     WantBlock(Cid, oneshot::Sender<Result<Block>>),
@@ -79,27 +80,9 @@ impl<TBlockStore: BsBlockStore> Bitswap<TBlockStore> {
         }
     }
 
-    /// Get handler of floodsub, swarm will call "handle" func after muxer negotiate success.
-    pub fn handler(&self) -> Handler {
-        Handler::new(self.incoming_tx.clone(), self.peer_tx.clone())
-    }
-
     /// Get control of floodsub, which can be used to publish or subscribe.
     pub fn control(&self) -> Control {
         Control::new(self.control_tx.clone())
-    }
-
-    /// Start message process loop.
-    pub fn start(mut self, control: SwarmControl) {
-        self.swarm = Some(control);
-
-        // well, self 'move' explicitly,
-        let mut bitswap = self;
-        task::spawn(async move {
-            log::info!("starting bitswap main loop...");
-            let _ = bitswap.process_loop().await;
-            log::info!("exiting bitswap main loop...");
-        });
     }
 
     /// Message Process Loop.
@@ -390,3 +373,25 @@ impl<TBlockStore: BsBlockStore> Bitswap<TBlockStore> {
     }
 }
 
+impl<TBlockStore: BsBlockStore> ProtocolImpl for Bitswap<TBlockStore> {
+
+    /// Get handler of floodsub, swarm will call "handle" func after muxer negotiate success.
+    fn handler(&self) -> IProtocolHandler {
+        Box::new(Handler::new(self.incoming_tx.clone(), self.peer_tx.clone()))
+    }
+
+    /// Start message process loop.
+    fn start(mut self, swarm: SwarmControl) -> Option<task::TaskHandle<()>> where
+        Self: Sized, {
+        self.swarm = Some(swarm);
+
+        // well, self 'move' explicitly,
+        let mut bitswap = self;
+
+        Some(task::spawn(async move {
+            log::info!("starting bitswap main loop...");
+            let _ = bitswap.process_loop().await;
+            log::info!("exiting bitswap main loop...");
+        }))
+    }
+}

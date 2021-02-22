@@ -18,7 +18,7 @@ impl Control {
     }
 
     /// Closes the bitswap main loop.
-    pub async fn close(&mut self) {
+    pub fn close(&mut self) {
         // simply close the tx, then exit the main loop
         // TODO: wait for the main loop to exit before returning
         self.0.close_channel();

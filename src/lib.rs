@@ -964,10 +964,12 @@ impl<Types: IpfsTypes> Ipfs<Types> {
     pub async fn exit_daemon(mut self) {
         self.repo.shutdown();
 
-        self.controls.kad().close().await;
-        self.controls.swarm().close().await;
-        self.controls.bitswap().close().await;
-        // TODO: close pubsub mdns...
+        self.controls.kad().close();
+        self.controls.bitswap().close();
+        self.controls.pubsub().close();
+
+        self.controls.swarm().close();
+        // TODO: close mdns...
     }
 
 
