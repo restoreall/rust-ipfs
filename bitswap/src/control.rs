@@ -24,12 +24,21 @@ impl Control {
         self.0.close_channel();
     }
 
-    /// Queues the wanted block for all peers.
+    /// Retrieves the wanted block.
     ///
     /// A user request
     pub async fn want_block(&mut self, cid: Cid, _priority: Priority) -> Result<Block, BitswapError> {
         let (tx, rx) = oneshot::channel();
         self.0.send(ControlCommand::WantBlock(cid, tx)).await?;
+        rx.await?
+    }
+
+    /// Announces a new block.
+    ///
+    /// A user request
+    pub async fn has_block(&mut self, cid: Cid) -> Result<(), BitswapError> {
+        let (tx, rx) = oneshot::channel();
+        self.0.send(ControlCommand::HasBlock(cid, tx)).await?;
         rx.await?
     }
 

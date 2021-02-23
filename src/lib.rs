@@ -35,6 +35,8 @@ pub mod refs;
 pub mod repo;
 pub mod unixfs;
 
+mod exchange;
+
 #[macro_use]
 extern crate tracing;
 
@@ -406,22 +408,25 @@ impl<Types: IpfsTypes> UninitializedIpfs<Types> {
                                 let _ = reply.send(b);
                             },
                             RepoEvent::UnwantBlock(cid) => {
-                                bitswap.cancel_block(cid).await.map_err(Error::from);
+                                let _ = bitswap.cancel_block(cid).await;
                             },
                             RepoEvent::NewBlock(cid, ret) => {
+                                let _ = bitswap.has_block(cid).await;
+                                let _ = ret.send(Ok(()));
+
                                 // TODO: consider if cancel is applicable in cases where we provide the
                                 // associated Block ourselves
                                 //self.controls.bitswap().cancel_block(&cid);
                                 // currently disabled; see https://github.com/rs-ipfs/rust-ipfs/pull/281#discussion_r465583345
                                 // for details regarding the concerns about enabling this functionality as-is
-                                let _ = ret.send(Ok(()));
+                                // let _ = ret.send(Ok(()));
                                 // if false {
                                 //     let _ = ret.send(self.swarm.start_providing(cid));
                                 // } else {
                                 //     let _ = ret.send(Err(anyhow!("not actively providing blocks yet")));
                                 // }
                             }
-                            RepoEvent::RemovedBlock(cid) => {
+                            RepoEvent::RemovedBlock(_cid) => {
                                 //self.swarm.stop_providing_block(&cid)
                             },
                         }
@@ -884,7 +889,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
             .instrument(self.span.clone())
             .await
             .map(|peers| peers.into_iter().map(|p|p.node_id).collect())
-            .ok_or(anyhow!("Provider Not Found"))
+            .map_err(Error::from)
     }
 
     /// Establishes the node as a provider of a block with the given Cid: it publishes a provider

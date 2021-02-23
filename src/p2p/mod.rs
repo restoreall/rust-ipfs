@@ -153,7 +153,7 @@ pub async fn create_controls<TIpfsTypes: IpfsTypes>(
     swarm = swarm.with_protocol(floodsub);
 
     // bitswap
-    let bitswap = Bitswap::new(repo.clone());
+    let bitswap = Bitswap::new(repo.clone(), kad_control.clone());
     let bitswap_control = bitswap.control();
 
     // register bitswap into Swarm
