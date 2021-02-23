@@ -219,7 +219,7 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
                 let mut blocks = vec![];
                 for cid in to_check {
                     if let Ok(Some(block)) = blockstore.get(&cid).await {
-                        log::debug!("{} found in blockstore", cid);
+                        log::debug!("block {} found in blockstore", cid);
                         blocks.push(block);
                     }
                 }
@@ -321,13 +321,21 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
     ///
     /// A user request
     pub fn want_block(&mut self, cid: Cid, priority: Priority, reply: oneshot::Sender<Result<Block>>) {
-        log::debug!("bitswap want block {:?} ", cid);
+        log::debug!("bitswap want block {} ", cid);
 
         // TODO: should run a dedicated peer manager for find_providers...
         let mut routing = self.routing.clone();
+        let mut swarm = self.swarm.clone().expect("Swarm??");
         let key = cid.to_bytes();
         task::spawn(async move {
-            let _ = routing.find_providers(key, 1).await;
+            let r = routing.find_providers(key, 1).await;
+            if let Ok(peers) = r {
+                // open a connection toward the providers, so that bitswap could be happy
+                // to fetch the wanted blocks
+                for peer in peers {
+                    let _ = swarm.new_connection_no_routing(peer).await;
+                }
+            }
         });
 
         for (_peer_id, ledger) in self.connected_peers.iter_mut() {
@@ -354,7 +362,7 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
     ///
     /// A user request
     pub fn has_block(&mut self, cid: Cid, reply: oneshot::Sender<Result<()>>) {
-        log::debug!("bitswap has block {:?} ", cid);
+        log::debug!("bitswap has block {} ", cid);
 
         // firstly, cancel this new block and remove it from our wantlist
         for (_peer_id, ledger) in self.connected_peers.iter_mut() {
@@ -376,7 +384,7 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
     /// Can be either a user request or be called when the block
     /// was received.
     pub fn cancel_block(&mut self, cid: &Cid, reply: oneshot::Sender<Result<()>>) {
-        log::debug!("bitswap cancel block {:?} ", cid);
+        log::debug!("bitswap cancel block {} ", cid);
         for (_peer_id, ledger) in self.connected_peers.iter_mut() {
             ledger.cancel_block(cid);
         }

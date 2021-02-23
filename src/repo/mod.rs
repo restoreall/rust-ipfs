@@ -1,21 +1,18 @@
 //! Storage implementation(s) backing the [`crate::Ipfs`].
-use crate::error::Error;
-use crate::path::IpfsPath;
-use crate::{Block, IpfsOptions, BsBlockStore};
-use async_trait::async_trait;
-use cid::{self, Cid};
-use core::fmt::Debug;
-use futures::channel::{
-    mpsc::{channel, Receiver, Sender},
-    oneshot,
-};
-use futures::sink::SinkExt;
-use libp2p_rs::core::PeerId;
 use std::borrow::Borrow;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::{error, fmt, io};
+use core::fmt::Debug;
+use async_trait::async_trait;
+use cid::Cid;
+
+use libp2p_rs::core::PeerId;
+
+use crate::error::Error;
+use crate::path::IpfsPath;
+use crate::{Block, IpfsOptions, BsBlockStore};
 
 #[macro_use]
 #[cfg(test)]
@@ -46,13 +43,6 @@ impl From<&IpfsOptions> for RepoOptions {
             path: options.ipfs_path.clone(),
         }
     }
-}
-
-/// Convenience for creating a new `RepoBase` from the `RepoOptions`.
-pub fn create_repo<TRepoTypes: RepoTypes>(
-    options: RepoOptions,
-) -> (Repo<TRepoTypes>, Receiver<RepoEvent>) {
-    Repo::new(options)
 }
 
 /// A wrapper for `Cid` that has a `Multihash`-based equality check.
@@ -333,40 +323,11 @@ impl<T: RepoTypes> Clone for Repo<T> {
 struct RepoBase<TRepoTypes: RepoTypes> {
     block_store: TRepoTypes::TBlockStore,
     data_store: TRepoTypes::TDataStore,
-    events: Sender<RepoEvent>,
     lockfile: Arc<Mutex<TRepoTypes::TLock>>,
 }
 
-/// Events used to communicate to the swarm on repo changes.
-#[derive(Debug)]
-pub enum RepoEvent {
-    /// Signals a desired block.
-    WantBlock(Cid, oneshot::Sender<Result<Block, anyhow::Error>>),
-    /// Signals a desired block is no longer wanted.
-    UnwantBlock(Cid),
-    /// Signals the posession of a new block.
-    NewBlock(
-        Cid,
-        oneshot::Sender<Result<(), anyhow::Error>>,
-    ),
-    /// Signals the removal of a block.
-    RemovedBlock(Cid),
-}
-/*
-impl TryFrom<RequestKind> for RepoEvent {
-    type Error = &'static str;
-
-    fn try_from(req: RequestKind) -> Result<Self, Self::Error> {
-        if let RequestKind::GetBlock(cid) = req {
-            Ok(RepoEvent::UnwantBlock(cid))
-        } else {
-            Err("logic error: RepoEvent can only be created from a Request::GetBlock")
-        }
-    }
-}*/
-
 impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
-    pub fn new(options: RepoOptions) -> (Self, Receiver<RepoEvent>) {
+    pub fn new(options: RepoOptions) -> Self {
         let mut blockstore_path = options.path.clone();
         let mut datastore_path = options.path.clone();
         let mut lockfile_path = options.path;
@@ -377,22 +338,16 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
         let block_store = TRepoTypes::TBlockStore::new(blockstore_path);
         let data_store = TRepoTypes::TDataStore::new(datastore_path);
         let lockfile = TRepoTypes::TLock::new(lockfile_path);
-        let (sender, receiver) = channel(1);
 
-        (
-            Repo(Arc::new(RepoBase {
-                block_store,
-                data_store,
-                events: sender,
-                lockfile: Arc::new(Mutex::new(lockfile)),
-            })),
-            receiver,
-        )
+        Repo(Arc::new(RepoBase {
+            block_store,
+            data_store,
+            lockfile: Arc::new(Mutex::new(lockfile)),
+        }))
     }
 
     /// Shutdowns the repo, closes the repo event sender.
     pub fn shutdown(&self) {
-        self.0.events.clone().close_channel();
     }
 
     pub async fn init(&self) -> Result<(), Error> {
@@ -427,50 +382,13 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
     /// Puts a block into the block store.
     pub async fn put_block(&self, block: Block) -> Result<(Cid, BlockPut), Error> {
         let cid = block.cid.clone();
-        let (_cid, res) = self.0.block_store.put(block.clone()).await?;
-
-        // FIXME: this doesn't cause actual DHT providing yet, only some
-        // bitswap housekeeping; we might want to not ignore the channel
-        // errors when we actually start providing on the DHT
-        if let BlockPut::NewBlock = res {
-
-            // sending only fails if no one is listening anymore
-            // and that is okay with us.
-            let (tx, rx) = oneshot::channel();
-
-            self.0.events
-                .clone()
-                .send(RepoEvent::NewBlock(cid.clone(), tx))
-                .await
-                .ok();
-
-            // TODO: NewBlock
-            // if let Ok(Ok(kad_subscription)) = rx.await {
-            //     kad_subscription.await?;
-            // }
-        }
-
+        let (_cid, res) = self.0.block_store.put(block).await?;
         Ok((cid, res))
     }
 
-    /// Retrives a block from the block store, or starts fetching it from the network and awaits
-    /// until it has been fetched.
-    pub async fn get_block(&self, cid: &Cid) -> Result<Block, Error> {
-        // FIXME: here's a race: block_store might give Ok(None) and we get to create our
-        // subscription after the put has completed. So maybe create the subscription first, then
-        // cancel it?
-        if let Some(block) = self.get_block_now(&cid).await? {
-            Ok(block)
-        } else {
-            // TODO: WantBlock
-            let (tx, rx) = oneshot::channel();
-            self.0.events
-                .clone()
-                .send(RepoEvent::WantBlock(cid.to_owned(), tx))
-                .await
-                .ok();
-            rx.await?
-        }
+    /// Retrives a block from the block store.
+    pub async fn get_block(&self, cid: &Cid) -> Result<Option<Block>, Error> {
+        self.get_block_now(&cid).await
     }
 
     /// Retrieves a block from the block store if it's available locally.
@@ -496,12 +414,6 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
         match self.0.block_store.remove(&cid).await? {
             Ok(success) => match success {
                 BlockRm::Removed(_cid) => {
-                    // sending only fails if the background task has exited
-                    self.0.events
-                        .clone()
-                        .send(RepoEvent::RemovedBlock(cid.clone()))
-                        .await
-                        .ok();
                     Ok(cid.clone())
                 }
             },

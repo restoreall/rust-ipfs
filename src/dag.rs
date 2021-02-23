@@ -184,7 +184,7 @@ impl<Types: RepoTypes> IpldDag<Types> {
         };
         let cid = Cid::new(version, codec, hash)?;
         let block = Block::new(bytes, cid);
-        let (cid, _) = self.ipfs.repo.put_block(block).await?;
+        let cid = self.ipfs.put_block(block).await?;
         Ok(cid)
     }
 
@@ -277,7 +277,7 @@ impl<Types: RepoTypes> IpldDag<Types> {
         let mut cache = None;
 
         loop {
-            let block = match self.ipfs.repo.get_block(&current).await {
+            let block = match self.ipfs.get_block(&current).await {
                 Ok(block) => block,
                 Err(e) => return Err(RawResolveLocalError::Loading(current, e)),
             };
@@ -327,7 +327,7 @@ impl<Types: RepoTypes> IpldDag<Types> {
         loop {
             let (next, _) = lookup.pending_links();
 
-            let block = self.ipfs.repo.get_block(next).await?;
+            let block = self.ipfs.get_block(next).await?;
 
             match lookup.continue_walk(block.data(), cache)? {
                 NeedToLoadMore(next) => lookup = next,

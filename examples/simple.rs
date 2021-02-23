@@ -1,5 +1,4 @@
 use ipfs::{Ipfs, IpfsOptions, TestTypes, UninitializedIpfs};
-use tokio::task;
 
 #[tokio::main]
 async fn main() {
@@ -15,8 +14,7 @@ async fn main() {
     //opts.bootstrap.push(("/ip4/104.131.131.82/tcp/4001".parse().unwrap(), "QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ".parse().unwrap()));
     opts.bootstrap.push(("/ip4/127.0.0.1/tcp/4001".parse().unwrap(), "12D3KooWDsgzyxLH2fTrFeqxJrFxBz4uMEvw4gbR6yeAChSW6ELe".parse().unwrap()));
 
-    let (mut ipfs, fut): (Ipfs<TestTypes>, _) = UninitializedIpfs::new(opts).start().await.unwrap();
-    task::spawn(fut);
+    let mut ipfs: Ipfs<TestTypes> = UninitializedIpfs::new(opts).start().await.unwrap();
 
     let addrs = ipfs.identity().await.unwrap().1;
     println!("I am listening on {:?}", addrs);

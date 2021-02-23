@@ -8,8 +8,7 @@ async fn main() {
 
     // Initialize the repo and start a daemon
     let opts = IpfsOptions::inmemory_with_generated_keys();
-    let (ipfs, fut): (Ipfs<TestTypes>, _) = UninitializedIpfs::new(opts).start().await.unwrap();
-    task::spawn(fut);
+    let ipfs: Ipfs<TestTypes> = UninitializedIpfs::new(opts).start().await.unwrap();
 
     // Create a DAG
     let f1 = ipfs.put_dag(make_ipld!("block1"));

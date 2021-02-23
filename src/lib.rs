@@ -43,9 +43,6 @@ extern crate tracing;
 use anyhow::anyhow;
 use cid::Codec;
 use futures::{
-    channel::{
-        mpsc::{Receiver},
-    },
     stream::Stream,
 };
 use tracing::Span;
@@ -55,7 +52,6 @@ use std::{
     borrow::Borrow,
     collections::HashSet,
     env, fmt,
-    future::Future,
     ops::{Deref, DerefMut, Range},
     path::PathBuf,
     sync::atomic::Ordering,
@@ -65,7 +61,7 @@ use self::{
     dag::IpldDag,
     ipns::Ipns,
     p2p::{create_controls, SwarmOptions},
-    repo::{create_repo, Repo, RepoEvent, RepoOptions},
+    repo::{Repo, RepoOptions},
 };
 
 pub use self::{
@@ -327,7 +323,6 @@ pub struct UninitializedIpfs<Types: IpfsTypes> {
     repo: Repo<Types>,
     keys: Keypair,
     options: IpfsOptions,
-    repo_events: Receiver<RepoEvent>,
 }
 
 impl<Types: IpfsTypes> UninitializedIpfs<Types> {
@@ -339,14 +334,13 @@ impl<Types: IpfsTypes> UninitializedIpfs<Types> {
     /// `libp2p::Swarm`.
     pub fn new(options: IpfsOptions) -> Self {
         let repo_options = RepoOptions::from(&options);
-        let (repo, repo_events) = create_repo(repo_options);
+        let repo = Repo::new(repo_options);
         let keys = options.keypair.clone();
 
         UninitializedIpfs {
             repo,
             keys,
             options,
-            repo_events,
         }
     }
 
@@ -356,13 +350,10 @@ impl<Types: IpfsTypes> UninitializedIpfs<Types> {
     /// The future returned from this method should not need
     /// (instrumenting)[`tracing_futures::Instrument::instrument`] as the [`IpfsOptions::span`]
     /// will be used as parent span for all of the awaited and created futures.
-    pub async fn start(self) -> Result<(Ipfs<Types>, impl Future<Output = ()>), Error> {
-        use futures::stream::StreamExt;
-
+    pub async fn start(self) -> Result<Ipfs<Types>, Error> {
         let UninitializedIpfs {
             repo,
             keys,
-            mut repo_events,
             mut options,
         } = self;
 
@@ -378,15 +369,12 @@ impl<Types: IpfsTypes> UninitializedIpfs<Types> {
         // stored in the Ipfs, instrumenting every method call
         let facade_span = tracing::trace_span!("facade");
 
-        // instruments the Ipfs main loop, the background task.
-        let ipfs_span = tracing::trace_span!(parent: &root_span, "ipfs");
-
         repo.init().instrument(init_span.clone()).await?;
 
         // FIXME: mutating options above is an unfortunate side-effect of this call, which could be
         // reordered for less error prone code.
         let swarm_options = SwarmOptions::from(&options);
-        let mut controls = create_controls(swarm_options, repo.clone())
+        let controls = create_controls(swarm_options, repo.clone())
             .instrument(tracing::trace_span!(parent: &init_span, "swarm"))
             .await;
 
@@ -397,54 +385,7 @@ impl<Types: IpfsTypes> UninitializedIpfs<Types> {
             controls: controls.clone(),
         };
 
-        let mut bitswap = controls.bitswap().clone();
-        let fut = async move {
-            loop {
-                match repo_events.next().await {
-                    Some(evt) => {
-                        match evt {
-                            RepoEvent::WantBlock(cid, reply) => {
-                                let b = bitswap.want_block(cid, 1).await.map_err(Error::from);
-                                let _ = reply.send(b);
-                            },
-                            RepoEvent::UnwantBlock(cid) => {
-                                let _ = bitswap.cancel_block(cid).await;
-                            },
-                            RepoEvent::NewBlock(cid, ret) => {
-                                let _ = bitswap.has_block(cid).await;
-                                let _ = ret.send(Ok(()));
-
-                                // TODO: consider if cancel is applicable in cases where we provide the
-                                // associated Block ourselves
-                                //self.controls.bitswap().cancel_block(&cid);
-                                // currently disabled; see https://github.com/rs-ipfs/rust-ipfs/pull/281#discussion_r465583345
-                                // for details regarding the concerns about enabling this functionality as-is
-                                // let _ = ret.send(Ok(()));
-                                // if false {
-                                //     let _ = ret.send(self.swarm.start_providing(cid));
-                                // } else {
-                                //     let _ = ret.send(Err(anyhow!("not actively providing blocks yet")));
-                                // }
-                            }
-                            RepoEvent::RemovedBlock(_cid) => {
-                                //self.swarm.stop_providing_block(&cid)
-                            },
-                        }
-                    }
-                    None => {
-                        log::warn!("we are closed. exiting...");
-                        return;
-                    }
-                }
-            }
-        };
-
-        // TODO:
-        // for addr in listening_addrs.into_iter() {
-        //     fut.start_add_listener_address(addr, None);
-        // }
-
-        Ok((ipfs, fut.instrument(ipfs_span)))
+        Ok(ipfs)
     }
 }
 
@@ -468,17 +409,29 @@ impl<Types: IpfsTypes> Ipfs<Types> {
     /// Forgetting the returned future will not result in memory unsafety, but it can
     /// deadlock other tasks.
     pub async fn put_block(&self, block: Block) -> Result<Cid, Error> {
-        self.repo
+        let (cid, res) = self.repo
             .put_block(block)
             .instrument(self.span.clone())
-            .await
-            .map(|(cid, _put_status)| cid)
+            .await?;
+
+        // publish to bitswap
+        if let BlockPut::NewBlock = res {
+            let _ = self.controls.bitswap().has_block(cid.clone()).await?;
+        }
+
+        Ok(cid)
     }
 
     /// Retrieves a block from the local blockstore, or starts fetching from the network or join an
     /// already started fetch.
     pub async fn get_block(&self, cid: &Cid) -> Result<Block, Error> {
-        self.repo.get_block(cid).instrument(self.span.clone()).await
+        let block = self.repo.get_block(cid).instrument(self.span.clone()).await?;
+
+        if let Some(block) = block {
+            Ok(block)
+        } else {
+            self.controls.bitswap().want_block(cid.clone(), 1).await.map_err(Error::from)
+        }
     }
 
     /// Remove block from the ipfs repo. A pinned block cannot be removed.
@@ -514,7 +467,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
 
         async move {
             // this needs to download everything but /pin/ls does not
-            let Block { data, .. } = self.repo.get_block(cid).await?;
+            let Block { data, .. } = self.get_block(cid).await?;
 
             if !recursive {
                 self.repo.insert_direct_pin(cid).await
@@ -697,7 +650,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
     /// Assumes the bootstrap nodes have been added to the routing table already.
     /// Check [SwarmOptions::bootstrap] for details.
     pub async fn bootstrap(&mut self) {
-        self.controls.kad().bootstrap().await;
+        self.controls.kad_mut().bootstrap().await;
     }
 
     // pub fn connections(&self) -> impl Iterator<Item = Connection> + '_ {
@@ -711,7 +664,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
     /// Returns a future which will complete when the connection has been successfully made or
     /// failed for whatever reason.
     pub async fn connect(&mut self, target: MultiaddrWithPeerId) -> Result<(), Error> {
-        self.controls.swarm().connect_with_addrs(target.peer_id, vec![target.multiaddr.into()])
+        self.controls.swarm_mut().connect_with_addrs(target.peer_id, vec![target.multiaddr.into()])
             .instrument(self.span.clone())
             .await
             .map_err(Error::from)
@@ -722,7 +675,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
     /// At the moment the peer is disconnected by temporarily banning the peer and unbanning it
     /// right after. This should always disconnect all connections to the peer.
     pub async fn disconnect(&mut self, target: MultiaddrWithPeerId) -> Result<(), Error> {
-        self.controls.swarm().disconnect(target.peer_id)
+        self.controls.swarm_mut().disconnect(target.peer_id)
             .instrument(self.span.clone())
             .await
             .map_err(Error::from)
@@ -735,7 +688,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
 
     /// Returns local listening addresses
     pub async fn addrs_local(&mut self) -> Result<Vec<Multiaddr>, Error> {
-        self.controls.swarm().self_addrs()
+        self.controls.swarm_mut().self_addrs()
             .instrument(self.span.clone())
             .await
             .map_err(Error::from)
@@ -743,7 +696,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
 
     /// Returns the connected peers - connections
     pub async fn peers(&mut self) -> Result<Vec<Connection>, Error> {
-        let connections = self.controls.swarm().dump_connections(None)
+        let connections = self.controls.swarm_mut().dump_connections(None)
             .instrument(self.span.clone())
             .await?;
 
@@ -769,7 +722,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
     ///
     /// Public key can be converted to [`PeerId`].
     pub async fn identity(&mut self) -> Result<(PublicKey, Vec<Multiaddr>), Error> {
-        let ii = self.controls.swarm().retrieve_identify_info()
+        let ii = self.controls.swarm_mut().retrieve_identify_info()
             .instrument(self.span.clone())
             .await?;
         Ok((ii.public_key, ii.listen_addrs))
@@ -779,7 +732,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
     /// The subscription can be unsubscribed by dropping the stream or calling
     /// [`Ipfs::pubsub_unsubscribe`].
     pub async fn pubsub_subscribe(&mut self, topic: String) -> Result<Subscription, Error> {
-        self.controls.pubsub().subscribe(Topic::new(topic))
+        self.controls.pubsub_mut().subscribe(Topic::new(topic))
             .instrument(self.span.clone())
             .await
             .map_err(Error::from)
@@ -787,7 +740,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
 
     /// Publishes to the topic which may have been subscribed to earlier
     pub async fn pubsub_publish(&mut self, topic: String, data: Vec<u8>) -> Result<(), Error> {
-        self.controls.pubsub().publish(Topic::new(topic), data)
+        self.controls.pubsub_mut().publish(Topic::new(topic), data)
             .instrument(self.span.clone())
             .await
             .map_err(Error::from)
@@ -820,7 +773,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
             String::new()
         };
 
-        self.controls.pubsub().get_peers(Topic::new(topic))
+        self.controls.pubsub_mut().get_peers(Topic::new(topic))
             .instrument(self.span.clone())
             .await
             .map_err(Error::from)
@@ -828,7 +781,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
 
     /// Returns all currently subscribed topics
     pub async fn pubsub_subscribed(&mut self) -> Result<Vec<String>, Error> {
-        let topics = self.controls.pubsub().ls()
+        let topics = self.controls.pubsub_mut().ls()
             .instrument(self.span.clone())
             .await
             .map_err(Error::from)?;
@@ -843,7 +796,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
         &mut self,
         peer: Option<PeerId>,
     ) -> Result<Vec<(Cid, bitswap::Priority)>, Error> {
-        self.controls.bitswap().wantlist(peer)
+        self.controls.bitswap_mut().wantlist(peer)
             .instrument(self.span.clone())
             .await
             .map_err(Error::from)
@@ -853,15 +806,15 @@ impl<Types: IpfsTypes> Ipfs<Types> {
     pub async fn bitswap_stats(
         &mut self,
     ) -> Result<BitswapStats, Error> {
-        let stats = self.controls.bitswap().stats()
+        let stats = self.controls.bitswap_mut().stats()
             .instrument(self.span.clone())
             .await
             .map_err(Error::from)?;
-        let peers = self.controls.bitswap().peers()
+        let peers = self.controls.bitswap_mut().peers()
             .instrument(self.span.clone())
             .await
             .map_err(Error::from)?;
-        let wantlist = self.controls.bitswap().wantlist(None)
+        let wantlist = self.controls.bitswap_mut().wantlist(None)
             .instrument(self.span.clone())
             .await
             .map_err(Error::from)?;
@@ -874,7 +827,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
     /// when it's finished, the newly added DHT records are checked for the existence of the desired
     /// `peer_id` and if it's there, the list of its known addresses is returned.
     pub async fn find_peer(&mut self, peer_id: PeerId) -> Result<Vec<Multiaddr>, Error> {
-        self.controls.kad().find_peer(&peer_id)
+        self.controls.kad_mut().find_peer(&peer_id)
             .instrument(self.span.clone())
             .await
             .map(|kad_peer| kad_peer.multiaddrs)
@@ -885,7 +838,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
     ///
     /// Returns a list of peers found providing the Cid.
     pub async fn get_providers(&mut self, cid: Cid) -> Result<Vec<PeerId>, Error> {
-        self.controls.kad().find_providers(cid.to_bytes(), 1)
+        self.controls.kad_mut().find_providers(cid.to_bytes(), 1)
             .instrument(self.span.clone())
             .await
             .map(|peers| peers.into_iter().map(|p|p.node_id).collect())
@@ -905,7 +858,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
             ));
         }
 
-        self.controls.kad().provide(cid.to_bytes())
+        self.controls.kad_mut().provide(cid.to_bytes())
             .instrument(self.span.clone())
             .await
             .map_err(Error::from)
@@ -915,7 +868,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
     /// node must have at least one known peer in its routing table in order for the query
     /// to return any values.
     pub async fn get_closest_peers(&mut self, peer_id: PeerId) -> Result<Vec<PeerId>, Error> {
-        self.controls.kad().lookup(peer_id.to_bytes().into())
+        self.controls.kad_mut().lookup(peer_id.to_bytes().into())
             .instrument(self.span.clone())
             .await
             .map(|peers| peers.into_iter().map(|p|p.node_id).collect())
@@ -929,7 +882,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
         &mut self,
         key: T,
     ) -> Result<Vec<u8>, Error> {
-        self.controls.kad().get_value(key.into().to_vec())
+        self.controls.kad_mut().get_value(key.into().to_vec())
             .instrument(self.span.clone())
             .await
             .map_err(Error::from)
@@ -943,7 +896,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
         key: T,
         value: Vec<u8>,
     ) -> Result<(), Error> {
-        self.controls.kad().put_value(key.into().to_vec(), value)
+        self.controls.kad_mut().put_value(key.into().to_vec(), value)
             .instrument(self.span.clone())
             .await
             .map_err(Error::from)
@@ -969,11 +922,11 @@ impl<Types: IpfsTypes> Ipfs<Types> {
     pub async fn exit_daemon(mut self) {
         self.repo.shutdown();
 
-        self.controls.kad().close();
-        self.controls.bitswap().close();
-        self.controls.pubsub().close();
+        self.controls.kad_mut().close();
+        self.controls.bitswap_mut().close();
+        self.controls.pubsub_mut().close();
 
-        self.controls.swarm().close();
+        self.controls.swarm_mut().close();
         // TODO: close mdns...
     }
 
@@ -983,9 +936,9 @@ impl<Types: IpfsTypes> Ipfs<Types> {
 
         app.add_subcommand_with_userdata(ipfs_cli_commands(), Box::new(self.clone()));
 
-        app.add_subcommand_with_userdata(swarm_cli_commands(), Box::new(self.controls.swarm().clone()));
-        app.add_subcommand_with_userdata(dht_cli_commands(), Box::new(self.controls.kad().clone()));
-        app.add_subcommand_with_userdata(bitswap_cli_commands(), Box::new(self.controls.bitswap().clone()));
+        app.add_subcommand_with_userdata(swarm_cli_commands(), Box::new(self.controls.swarm_mut().clone()));
+        app.add_subcommand_with_userdata(dht_cli_commands(), Box::new(self.controls.kad_mut().clone()));
+        app.add_subcommand_with_userdata(bitswap_cli_commands(), Box::new(self.controls.bitswap_mut().clone()));
 
         app.run();
 
@@ -1053,6 +1006,7 @@ use libp2p_rs::swarm::cli::swarm_cli_commands;
 use libp2p_rs::kad::cli::dht_cli_commands;
 use crate::cli::ipfs_cli_commands;
 use crate::cli::bitswap_cli_commands;
+use crate::repo::BlockPut;
 
 /// Node module provides an easy to use interface used in `tests/`.
 mod node {
@@ -1069,8 +1023,6 @@ mod node {
         /// The listened to and externally visible addresses. The addresses are suffixed with the
         /// P2p protocol containing the node's PeerID.
         pub addrs: Vec<Multiaddr>,
-        /// Stores the single background task spawned for the node.
-        pub bg_task: tokio::task::JoinHandle<()>,
     }
 
     impl Node {
@@ -1097,16 +1049,13 @@ mod node {
             // for future: assume UninitializedIpfs handles instrumenting any futures with the
             // given span
 
-            let (mut ipfs, fut): (Ipfs<TestTypes>, _) =
-                UninitializedIpfs::new(opts).start().await.unwrap();
-            let bg_task = tokio::task::spawn(fut);
+            let mut ipfs = UninitializedIpfs::new(opts).start().await.unwrap();
             let addrs = ipfs.identity().await.unwrap().1;
 
             Node {
                 ipfs,
                 id,
                 addrs,
-                bg_task,
             }
         }
 
@@ -1116,7 +1065,7 @@ mod node {
         /// ran with random keys so that the buckets farther from the closest neighbor also
         /// get refreshed.
         pub async fn bootstrap(&mut self) {
-            self.controls.kad().bootstrap().await;
+            self.controls.kad_mut().bootstrap().await;
         }
 
         /// Add a known listen address of a peer participating in the DHT to the routing table.
@@ -1128,7 +1077,7 @@ mod node {
                 addr.pop();
             }
 
-            self.controls.kad().add_node(peer_id, vec![addr]).await;
+            self.controls.kad_mut().add_node(peer_id, vec![addr]).await;
         }
 
         /// Returns the Bitswap peers for the a `Node`.
@@ -1147,7 +1096,6 @@ mod node {
         /// Shuts down the `Node`.
         pub async fn shutdown(self) {
             self.ipfs.exit_daemon().await;
-            let _ = self.bg_task.await;
         }
     }
 

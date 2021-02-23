@@ -145,12 +145,10 @@ fn main() {
         };
 
         // TODO: handle errors more gracefully.
-        let (ipfs, task): (Ipfs<ipfs::Types>, _) = UninitializedIpfs::new(opts)
+        let ipfs: Ipfs<ipfs::Types> = UninitializedIpfs::new(opts)
             .start()
             .await
             .expect("Initialization failed");
-
-        tokio::spawn(task);
 
         let api_link_file = home.join("api");
 

@@ -177,8 +177,7 @@ mod tests {
         use ipfs::{IpfsOptions, UninitializedIpfs};
 
         let options = IpfsOptions::inmemory_with_generated_keys();
-        let (ipfs, _): (Ipfs<TestTypes>, _) =
-            UninitializedIpfs::new(options).start().await.unwrap();
+        let ipfs: Ipfs<TestTypes> = UninitializedIpfs::new(options).start().await.unwrap();
 
         let (shutdown_tx, _) = tokio::sync::mpsc::channel::<()>(1);
 

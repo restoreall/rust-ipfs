@@ -50,11 +50,7 @@ async fn main() {
 
     // UninitializedIpfs will handle starting up the repository and return the facade (ipfs::Ipfs)
     // and the background task (ipfs::IpfsFuture).
-    let (ipfs, fut): (Ipfs<TestTypes>, _) = UninitializedIpfs::new(opts).start().await.unwrap();
-
-    // The background task must be spawned to use anything other than the repository; most notably,
-    // the libp2p.
-    tokio::task::spawn(fut);
+    let mut ipfs: Ipfs<TestTypes> = UninitializedIpfs::new(opts).start().await.unwrap();
 
     if bootstrappers == BootstrapperOption::RestoreDefault {
         // applications wishing to find content on the global IPFS swarm should restore the latest

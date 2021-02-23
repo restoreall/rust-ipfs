@@ -2,7 +2,7 @@
 use std::time::Duration;
 
 use crate::repo::Repo;
-use crate::{IpfsOptions, IpfsTypes, Cid};
+use crate::{IpfsOptions, IpfsTypes};
 
 pub(crate) mod addr;
 pub(crate) mod pubsub;
@@ -212,19 +212,6 @@ impl<Types: IpfsTypes> Controls<Types> {
     //     // TODO self.bitswap.remove_peer(&peer);
     // }
 
-    // FIXME: it would be best if get_providers is called only in case the already connected
-    // peers don't have it
-    pub async fn want_block(&mut self, cid: Cid) {
-        let _ = self.kad.find_providers(cid.clone().into(), 1).await;
-        let _ = self.bitswap.want_block(cid, 1).await;
-    }
-
-    pub async fn stop_providing_block(&mut self, cid: &Cid) {
-        info!("Finished providing block {}", cid.to_string());
-        //let hash = Multihash::from_bytes(cid.to_bytes()).unwrap();
-        //self.kad.remove_providing(&hash);
-    }
-
     pub fn addrs(&self) -> Vec<(PeerId, Vec<Multiaddr>)> {
         let peers = self.swarm.get_peers();
         let mut addrs = Vec::with_capacity(peers.len());
@@ -236,19 +223,26 @@ impl<Types: IpfsTypes> Controls<Types> {
         addrs
     }
 
-    pub fn swarm(&mut self) -> &mut SwarmControl {
+    pub fn swarm_mut(&mut self) -> &mut SwarmControl {
         &mut self.swarm
     }
 
-    pub fn kad(&mut self) -> &mut KadControl {
+    pub fn kad_mut(&mut self) -> &mut KadControl {
         &mut self.kad
     }
 
-    pub fn pubsub(&mut self) -> &mut FloodsubControl {
+    pub fn pubsub_mut(&mut self) -> &mut FloodsubControl {
         &mut self.pubsub
     }
 
-    pub fn bitswap(&mut self) -> &mut BitswapControl {
+    pub fn bitswap_mut(&mut self) -> &mut BitswapControl {
         &mut self.bitswap
+    }
+
+    pub fn swarm(&self) -> SwarmControl {
+        self.swarm.clone()
+    }
+    pub fn bitswap(&self) -> BitswapControl {
+        self.bitswap.clone()
     }
 }

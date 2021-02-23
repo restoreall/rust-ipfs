@@ -2051,7 +2051,7 @@ checksum = "b7282d924be3275cec7f6756ff4121987bc6481325397dde6ba3e7802b1a8b1c"
 [[package]]
 name = "libp2p-rs"
 version = "0.2.1"
-source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#79a710455fe8be739113985b6759d8e73185722a"
+source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#ecbf345aa55f18dd5c9d75a35fdeca88f0b7fbe4"
 dependencies = [
  "async-trait",
  "libc",
@@ -2081,7 +2081,7 @@ dependencies = [
 [[package]]
 name = "libp2prs-core"
 version = "0.2.1"
-source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#79a710455fe8be739113985b6759d8e73185722a"
+source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#ecbf345aa55f18dd5c9d75a35fdeca88f0b7fbe4"
 dependencies = [
  "asn1_der",
  "async-trait",
@@ -2118,7 +2118,7 @@ dependencies = [
 [[package]]
 name = "libp2prs-dns"
 version = "0.2.1"
-source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#79a710455fe8be739113985b6759d8e73185722a"
+source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#ecbf345aa55f18dd5c9d75a35fdeca88f0b7fbe4"
 dependencies = [
  "async-trait",
  "libp2prs-core",
@@ -2129,7 +2129,7 @@ dependencies = [
 [[package]]
 name = "libp2prs-exporter"
 version = "0.2.1"
-source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#79a710455fe8be739113985b6759d8e73185722a"
+source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#ecbf345aa55f18dd5c9d75a35fdeca88f0b7fbe4"
 dependencies = [
  "futures",
  "lazy_static",
@@ -2146,7 +2146,7 @@ dependencies = [
 [[package]]
 name = "libp2prs-floodsub"
 version = "0.2.1"
-source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#79a710455fe8be739113985b6759d8e73185722a"
+source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#ecbf345aa55f18dd5c9d75a35fdeca88f0b7fbe4"
 dependencies = [
  "async-trait",
  "futures",
@@ -2165,7 +2165,7 @@ dependencies = [
 [[package]]
 name = "libp2prs-infoserver"
 version = "0.2.1"
-source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#79a710455fe8be739113985b6759d8e73185722a"
+source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#ecbf345aa55f18dd5c9d75a35fdeca88f0b7fbe4"
 dependencies = [
  "lazy_static",
  "libp2prs-core",
@@ -2180,7 +2180,7 @@ dependencies = [
 [[package]]
 name = "libp2prs-kad"
 version = "0.2.1"
-source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#79a710455fe8be739113985b6759d8e73185722a"
+source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#ecbf345aa55f18dd5c9d75a35fdeca88f0b7fbe4"
 dependencies = [
  "arrayvec",
  "async-trait",
@@ -2205,7 +2205,7 @@ dependencies = [
 [[package]]
 name = "libp2prs-mdns"
 version = "0.2.1"
-source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#79a710455fe8be739113985b6759d8e73185722a"
+source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#ecbf345aa55f18dd5c9d75a35fdeca88f0b7fbe4"
 dependencies = [
  "data-encoding",
  "dns-parser",
@@ -2225,7 +2225,7 @@ dependencies = [
 [[package]]
 name = "libp2prs-mplex"
 version = "0.2.1"
-source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#79a710455fe8be739113985b6759d8e73185722a"
+source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#ecbf345aa55f18dd5c9d75a35fdeca88f0b7fbe4"
 dependencies = [
  "async-trait",
  "bytes 0.5.6",
@@ -2242,7 +2242,7 @@ dependencies = [
 [[package]]
 name = "libp2prs-multiaddr"
 version = "0.2.1"
-source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#79a710455fe8be739113985b6759d8e73185722a"
+source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#ecbf345aa55f18dd5c9d75a35fdeca88f0b7fbe4"
 dependencies = [
  "arrayref",
  "bs58",
@@ -2258,7 +2258,7 @@ dependencies = [
 [[package]]
 name = "libp2prs-noise"
 version = "0.2.1"
-source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#79a710455fe8be739113985b6759d8e73185722a"
+source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#ecbf345aa55f18dd5c9d75a35fdeca88f0b7fbe4"
 dependencies = [
  "async-trait",
  "bytes 0.5.6",
@@ -2281,7 +2281,7 @@ dependencies = [
 [[package]]
 name = "libp2prs-plaintext"
 version = "0.2.1"
-source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#79a710455fe8be739113985b6759d8e73185722a"
+source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#ecbf345aa55f18dd5c9d75a35fdeca88f0b7fbe4"
 dependencies = [
  "async-trait",
  "bytes 0.5.6",
@@ -2296,7 +2296,7 @@ dependencies = [
 [[package]]
 name = "libp2prs-runtime"
 version = "0.2.1"
-source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#79a710455fe8be739113985b6759d8e73185722a"
+source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#ecbf345aa55f18dd5c9d75a35fdeca88f0b7fbe4"
 dependencies = [
  "async-std",
  "futures",
@@ -2306,7 +2306,7 @@ dependencies = [
 [[package]]
 name = "libp2prs-secio"
 version = "0.2.1"
-source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#79a710455fe8be739113985b6759d8e73185722a"
+source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#ecbf345aa55f18dd5c9d75a35fdeca88f0b7fbe4"
 dependencies = [
  "aes-ctr",
  "async-trait",
@@ -2328,7 +2328,7 @@ dependencies = [
 [[package]]
 name = "libp2prs-swarm"
 version = "0.2.1"
-source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#79a710455fe8be739113985b6759d8e73185722a"
+source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#ecbf345aa55f18dd5c9d75a35fdeca88f0b7fbe4"
 dependencies = [
  "async-trait",
  "crossbeam-epoch",
@@ -2349,7 +2349,7 @@ dependencies = [
 [[package]]
 name = "libp2prs-tcp"
 version = "0.2.1"
-source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#79a710455fe8be739113985b6759d8e73185722a"
+source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#ecbf345aa55f18dd5c9d75a35fdeca88f0b7fbe4"
 dependencies = [
  "async-trait",
  "futures",
@@ -2365,7 +2365,7 @@ dependencies = [
 [[package]]
 name = "libp2prs-traits"
 version = "0.2.1"
-source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#79a710455fe8be739113985b6759d8e73185722a"
+source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#ecbf345aa55f18dd5c9d75a35fdeca88f0b7fbe4"
 dependencies = [
  "async-trait",
  "futures",
@@ -2375,7 +2375,7 @@ dependencies = [
 [[package]]
 name = "libp2prs-websocket"
 version = "0.2.1"
-source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#79a710455fe8be739113985b6759d8e73185722a"
+source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#ecbf345aa55f18dd5c9d75a35fdeca88f0b7fbe4"
 dependencies = [
  "async-tls",
  "async-trait",
@@ -2396,7 +2396,7 @@ dependencies = [
 [[package]]
 name = "libp2prs-yamux"
 version = "0.2.1"
-source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#79a710455fe8be739113985b6759d8e73185722a"
+source = "git+https://github.com/kingwel-xie/libp2p-rs.git?branch=master#ecbf345aa55f18dd5c9d75a35fdeca88f0b7fbe4"
 dependencies = [
  "async-trait",
  "bytes 0.5.6",
