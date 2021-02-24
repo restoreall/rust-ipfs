@@ -2,10 +2,10 @@ use ipfs::{Ipfs, IpfsOptions, TestTypes, UninitializedIpfs};
 
 #[tokio::main]
 async fn main() {
-    // tracing_subscriber::fmt()
-    //     .with_max_level(tracing::Level::DEBUG)
-    //     .init();
-    env_logger::init();
+    tracing_subscriber::fmt()
+        //.with_max_level(tracing::Level::DEBUG)
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
 
     // Initialize the repo and start a daemon
     let mut opts = IpfsOptions::inmemory_with_generated_keys();

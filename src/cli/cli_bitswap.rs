@@ -42,13 +42,17 @@ fn cli_wl_bitswap(app: &App, args: &[&str]) -> XcliResult {
 
     let mut bitswap = handler(app);
     executor::block_on(async {
-        bitswap.wantlist(peer)
-            .await
-            .map_or(println!("none"), |addrs| {
-                addrs
-                    .iter()
-                    .for_each(|(c, p)| println!("Cid: {} Priority: {:?}", c, p))
-            });
+        let r = bitswap.wantlist(peer).await;
+        match r {
+            Ok(list) => {
+                for (c, p) in list {
+                    println!("Cid: {}, Priority: {}", c, p);
+                }
+            }
+            Err(err) => {
+                println!("{:?}", err);
+            }
+        }
     });
 
     Ok(CmdExeCode::Ok)

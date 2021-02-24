@@ -1877,7 +1877,6 @@ dependencies = [
  "cid",
  "domain",
  "either",
- "env_logger",
  "fs2",
  "futures",
  "hex-literal",

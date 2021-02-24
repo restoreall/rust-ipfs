@@ -3,6 +3,7 @@ use libp2p_rs::core::PeerId;
 use libp2p_rs::floodsub::protocol::FloodsubMessage;
 use libp2p_rs::floodsub::subscription::Subscription;
 use futures::StreamExt;
+use std::sync::Arc;
 
 /// Adaptation hopefully supporting both Floodsub and Gossipsub Messages in the future
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -44,8 +45,8 @@ impl From<FloodsubMessage> for PubsubMessage {
 pub struct SubscriptionStream(Subscription);
 
 impl SubscriptionStream {
-    pub async fn next(&mut self) -> Option<FloodsubMessage> {
-        self.0.ch.next().await
+    pub async fn next(&mut self) -> Option<Arc<PubsubMessage>> {
+        self.0.ch.next().await.map(|m|Arc::new(m.into()))
     }
 }
 
