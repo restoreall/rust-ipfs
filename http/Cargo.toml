@@ -22,7 +22,7 @@ mpart-async = { default-features = false, version = "0.5" }
 multibase = { default-features = false, version = "0.8" }
 multihash = { default-features = false, version = "0.11" }
 # openssl is required for rsa keygen but not used by the rust-ipfs or its dependencies
-openssl = { default-features = false, version = "0.10" }
+#openssl = { default-features = false, version = "0.10" }
 percent-encoding = { default-features = false, version = "2.1" }
 prost = { default-features = false, version = "0.7" }
 serde = { default-features = false, features = ["derive"], version = "1.0" }

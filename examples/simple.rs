@@ -14,7 +14,7 @@ async fn main() {
     //opts.bootstrap.push(("/ip4/104.131.131.82/tcp/4001".parse().unwrap(), "QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ".parse().unwrap()));
     opts.bootstrap.push(("/ip4/127.0.0.1/tcp/4001".parse().unwrap(), "12D3KooWDsgzyxLH2fTrFeqxJrFxBz4uMEvw4gbR6yeAChSW6ELe".parse().unwrap()));
 
-    let mut ipfs: Ipfs<TestTypes> = UninitializedIpfs::new(opts).start().await.unwrap();
+    let ipfs: Ipfs<TestTypes> = UninitializedIpfs::new(opts).start().await.unwrap();
 
     let addrs = ipfs.identity().await.unwrap().1;
     println!("I am listening on {:?}", addrs);

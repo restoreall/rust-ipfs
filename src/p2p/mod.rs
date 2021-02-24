@@ -2,7 +2,7 @@
 use std::time::Duration;
 
 use crate::repo::Repo;
-use crate::{IpfsOptions, IpfsTypes};
+use crate::{IpfsOptions, RepoTypes};
 
 pub(crate) mod addr;
 pub(crate) mod pubsub;
@@ -38,23 +38,17 @@ use libp2p_rs::tcp::TcpConfig;
 //use libp2p_rs::dns::DnsConfig;
 
 /// Libp2p Network controllers.
-pub struct Controls<Types: IpfsTypes> {
-    repo: Repo<Types>,
-
+pub struct Controls {
     swarm: SwarmControl,
     kad: KadControl,
     pubsub: FloodsubControl,
-    // mdns: MdnsControl,
-
-
-    //kad_subscriptions: SubscriptionRegistry<KadResult, String>,
     bitswap: BitswapControl,
+    // mdns: MdnsControl,
 }
 
-impl<Types: IpfsTypes> Clone for Controls<Types> {
+impl Clone for Controls {
     fn clone(&self) -> Self {
         Self {
-            repo: self.repo.clone(),
             swarm: self.swarm.clone(),
             kad: self.kad.clone(),
             pubsub: self.pubsub.clone(),
@@ -96,102 +90,84 @@ impl From<&IpfsOptions> for SwarmOptions {
     }
 }
 
-/// Creates a new IPFS swarm.
-pub async fn create_controls<TIpfsTypes: IpfsTypes>(
-    options: SwarmOptions,
-    repo: Repo<TIpfsTypes>,
-) -> Controls<TIpfsTypes> {
-    let sec_secio = secio::Config::new(options.keypair.clone());
-    // Set up an encrypted TCP transport over the Yamux or Mplex protocol.
-    let xx_keypair = noise::Keypair::<noise::X25519Spec>::new()
-        .into_authentic(&options.keypair)
-        .unwrap();
-    let sec_noise = noise::NoiseConfig::xx(xx_keypair, options.keypair.clone());
-    let sec = Selector::new(sec_noise, sec_secio);
+impl Controls {
+    pub(crate) async fn build<T: RepoTypes>(repo: Repo<T>, options: SwarmOptions) -> Self {
+        // start with security layer
+        let sec_secio = secio::Config::new(options.keypair.clone());
+        // Set up an encrypted TCP transport over the Yamux or Mplex protocol.
+        let xx_keypair = noise::Keypair::<noise::X25519Spec>::new()
+            .into_authentic(&options.keypair)
+            .unwrap();
+        let sec_noise = noise::NoiseConfig::xx(xx_keypair, options.keypair.clone());
+        let sec = Selector::new(sec_noise, sec_secio);
 
-    // FIXME: timeout & DnsConfig
-    let mux = Selector::new(yamux::Config::new(), mplex::Config::new());
-    let tu = TransportUpgrade::new(TcpConfig::new().nodelay(true), mux, sec);//.timeout(Duration::from_secs(20));
+        // FIXME: timeout & DnsConfig
+        let mux = Selector::new(yamux::Config::new(), mplex::Config::new());
+        let tu = TransportUpgrade::new(TcpConfig::new().nodelay(true), mux, sec);//.timeout(Duration::from_secs(20));
 
-    // Make swarm
-    let mut swarm = Swarm::new(options.keypair.public())
-        .with_transport(Box::new(tu))
-        .with_ping(PingConfig::new())
-        .with_identify(IdentifyConfig::new(false));
+        // Make swarm
+        let mut swarm = Swarm::new(options.keypair.public())
+            .with_transport(Box::new(tu))
+            .with_ping(PingConfig::new())
+            .with_identify(IdentifyConfig::new(false));
 
-    swarm.listen_on(options.listening_addrs).unwrap();
+        swarm.listen_on(options.listening_addrs).unwrap();
 
-    let swarm_control = swarm.control();
+        let swarm_control = swarm.control();
 
-    log::info!("Swarm created, local-peer-id={:?}", swarm.local_peer_id());
+        log::info!("Swarm created, local-peer-id={:?}", swarm.local_peer_id());
 
-    // build Kad
-    let mut kad_config = KademliaConfig::default().with_query_timeout(Duration::from_secs(90));
-    if let Some(protocol) = options.kad_protocol {
-        fn string_to_static_str(s: String) -> &'static str {
-            Box::leak(s.into_boxed_str())
+        // build Kad
+        let mut kad_config = KademliaConfig::default().with_query_timeout(Duration::from_secs(90));
+        if let Some(protocol) = options.kad_protocol {
+            fn string_to_static_str(s: String) -> &'static str {
+                Box::leak(s.into_boxed_str())
+            }
+            let s = string_to_static_str(protocol);
+            kad_config = kad_config.with_protocol_name(ProtocolId::from(s.as_bytes()));
         }
-        let s = string_to_static_str(protocol);
-        kad_config = kad_config.with_protocol_name(ProtocolId::from(s.as_bytes()));
+
+        let store = MemoryStore::new(swarm.local_peer_id().clone());
+        let kad = Kademlia::with_config(swarm.local_peer_id().clone(), store, kad_config);
+
+        let mut kad_control = kad.control();
+
+        // update Swarm to support Kad and Routing
+        swarm = swarm.with_protocol(kad).with_routing(Box::new(kad_control.clone()));
+
+        let mut floodsub_config = FloodsubConfig::new(swarm.local_peer_id().clone());
+        floodsub_config.subscribe_local_messages = true;
+
+        let floodsub = FloodSub::new(floodsub_config);
+        let floodsub_control = floodsub.control();
+
+        // register floodsub into Swarm
+        swarm = swarm.with_protocol(floodsub);
+
+        // bitswap
+        let bitswap = Bitswap::new(repo, kad_control.clone());
+        let bitswap_control = bitswap.control();
+
+        // register bitswap into Swarm
+        swarm = swarm.with_protocol(bitswap);
+
+        // To start Swarm/Kad/... main loops
+        swarm.start();
+
+        // handle bootstrap nodes
+        for (addr, peer_id) in options.bootstrap {
+            kad_control.add_node(peer_id, vec![addr]).await;
+        }
+        kad_control.bootstrap().await;
+
+        Controls {
+            swarm: swarm_control,
+            kad: kad_control,
+            pubsub: floodsub_control,
+            bitswap: bitswap_control,
+            //mdns: ()
+        }
     }
-
-    let store = MemoryStore::new(swarm.local_peer_id().clone());
-    let kad = Kademlia::with_config(swarm.local_peer_id().clone(), store, kad_config);
-
-    let mut kad_control = kad.control();
-
-    // update Swarm to support Kad and Routing
-    swarm = swarm.with_protocol(kad).with_routing(Box::new(kad_control.clone()));
-
-    let mut floodsub_config = FloodsubConfig::new(swarm.local_peer_id().clone());
-    floodsub_config.subscribe_local_messages = true;
-
-    let floodsub = FloodSub::new(floodsub_config);
-    let floodsub_control = floodsub.control();
-
-    // register floodsub into Swarm
-    swarm = swarm.with_protocol(floodsub);
-
-    // bitswap
-    let bitswap = Bitswap::new(repo.clone(), kad_control.clone());
-    let bitswap_control = bitswap.control();
-
-    // register bitswap into Swarm
-    swarm = swarm.with_protocol(bitswap);
-
-    // To start Swarm/Kad/... main loops
-    swarm.start();
-
-    // handle bootstrap nodes
-    for (addr, peer_id) in options.bootstrap {
-        kad_control.add_node(peer_id, vec![addr]).await;
-    }
-    kad_control.bootstrap().await;
-
-    Controls {
-        repo,
-        swarm: swarm_control,
-        kad: kad_control,
-        pubsub: floodsub_control,
-        bitswap: bitswap_control,
-        //mdns: ()
-    }
-}
-
-// struct SpannedExecutor(Span);
-//
-// impl libp2p::core::Executor for SpannedExecutor {
-//     fn exec(
-//         &self,
-//         future: std::pin::Pin<Box<dyn std::future::Future<Output = ()> + 'static + Send>>,
-//     ) {
-//         use tracing_futures::Instrument;
-//         tokio::task::spawn(future.instrument(self.0.clone()));
-//     }
-// }
-
-
-impl<Types: IpfsTypes> Controls<Types> {
     //
     // pub async fn add_peer(&mut self, peer: PeerId, addr: Multiaddr) {
     //     self.kad.add_node(peer.clone(), vec![addr]).await;
@@ -226,15 +202,10 @@ impl<Types: IpfsTypes> Controls<Types> {
     pub fn swarm_mut(&mut self) -> &mut SwarmControl {
         &mut self.swarm
     }
-
     pub fn kad_mut(&mut self) -> &mut KadControl {
         &mut self.kad
     }
-
-    pub fn pubsub_mut(&mut self) -> &mut FloodsubControl {
-        &mut self.pubsub
-    }
-
+    pub fn pubsub_mut(&mut self) -> &mut FloodsubControl { &mut self.pubsub }
     pub fn bitswap_mut(&mut self) -> &mut BitswapControl {
         &mut self.bitswap
     }
@@ -242,6 +213,8 @@ impl<Types: IpfsTypes> Controls<Types> {
     pub fn swarm(&self) -> SwarmControl {
         self.swarm.clone()
     }
+    pub fn kad(&self) -> KadControl { self.kad.clone() }
+    pub fn pubsub(&self) -> FloodsubControl { self.pubsub.clone() }
     pub fn bitswap(&self) -> BitswapControl {
         self.bitswap.clone()
     }
