@@ -139,13 +139,15 @@ fn cli_get(app: &App, args: &[&str]) -> XcliResult {
                     let mut file_name = PathBuf::new();
 
                     if let Some("./") = root.to_str() {
-                        if let Some("") = path.clone().to_str() {
+                        if let Some("") = path.to_str() {
                             root.push(multibase::Base::Base32Upper.encode(tmp_cid.to_bytes()));
                             file_name = root.clone();
                         }
                     } else {
                         file_name = root.clone();
-                        file_name.push(path);
+                        if Some("") != path.to_str() {
+                            file_name.push(path);
+                        }
                     }
 
                     // If true, means that it is the first block.
@@ -201,8 +203,7 @@ fn cli_get(app: &App, args: &[&str]) -> XcliResult {
                         println!("Directory: {:?}", root_tmp)
                     }
                 }
-                ContinuedWalk::Symlink(_, _, _, _) => {
-                }
+                ContinuedWalk::Symlink(_, _, _, _) => {}
             }
         }
     });
