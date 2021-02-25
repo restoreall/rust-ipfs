@@ -127,15 +127,15 @@ impl Controls {
             kad_config = kad_config.with_protocol_name(ProtocolId::from(s.as_bytes()));
         }
 
-        let store = MemoryStore::new(swarm.local_peer_id().clone());
-        let kad = Kademlia::with_config(swarm.local_peer_id().clone(), store, kad_config);
+        let store = MemoryStore::new(*swarm.local_peer_id());
+        let kad = Kademlia::with_config(*swarm.local_peer_id(), store, kad_config);
 
         let mut kad_control = kad.control();
 
         // update Swarm to support Kad and Routing
         swarm = swarm.with_protocol(kad).with_routing(Box::new(kad_control.clone()));
 
-        let mut floodsub_config = FloodsubConfig::new(swarm.local_peer_id().clone());
+        let mut floodsub_config = FloodsubConfig::new(*swarm.local_peer_id());
         floodsub_config.subscribe_local_messages = true;
 
         let floodsub = FloodSub::new(floodsub_config);
@@ -193,7 +193,7 @@ impl Controls {
         let mut addrs = Vec::with_capacity(peers.len());
 
         for peer_id in peers.into_iter() {
-            let peer_addrs = self.swarm.get_addrs(&peer_id).unwrap_or(vec![]);
+            let peer_addrs = self.swarm.get_addrs(&peer_id).unwrap_or_default();
             addrs.push((peer_id, peer_addrs));
         }
         addrs

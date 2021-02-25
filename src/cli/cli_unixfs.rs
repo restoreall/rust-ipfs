@@ -20,7 +20,7 @@ pub(crate) fn cli_add_commands<'a>() -> Command<'a> {
 }
 
 fn cli_add(app: &App, args: &[&str]) -> XcliResult {
-    if args.len() < 1 {
+    if args.is_empty() {
         return Err(XcliError::MismatchArgument(1, args.len()));
     }
 
@@ -54,7 +54,7 @@ pub(crate) fn cli_cat_commands<'a>() -> Command<'a> {
 }
 
 fn cli_cat(app: &App, args: &[&str]) -> XcliResult {
-    if args.len() < 1 {
+    if args.is_empty() {
         return Err(XcliError::MismatchArgument(1, args.len()));
     }
 
@@ -102,14 +102,14 @@ fn cli_get(app: &App, args: &[&str]) -> XcliResult {
     // A symbol that means in the same tree.
     let mut same_file = false;
 
-    if args.len() < 1 {
+    if args.is_empty() {
         return Err(XcliError::MismatchArgument(1, args.len()));
     }
 
     let ipfs = handler(app);
 
     let cid = Cid::try_from(args[0]).map_err(|e| {
-        return BadArgument(e.to_string());
+       BadArgument(e.to_string())
     })?;
 
     let mut walker = Walker::new(cid, "".to_string());
@@ -183,7 +183,7 @@ fn cli_get(app: &App, args: &[&str]) -> XcliResult {
                 ContinuedWalk::Directory(_, path, _metadata)
                 | ContinuedWalk::RootDirectory(_, path, _metadata) => {
                     // Root directory
-                    if let Some("") = path.clone().to_str() {
+                    if let Some("") = path.to_str() {
                         root.push(multibase::Base::Base32Upper.encode(tmp_cid.to_bytes()));
                         DirBuilder::new().create(&root)
                             .unwrap_or_else(|e| {

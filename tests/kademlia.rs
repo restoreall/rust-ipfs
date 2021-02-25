@@ -1,6 +1,6 @@
 use cid::{Cid, Codec};
 use ipfs::{p2p::MultiaddrWithPeerId, Block, Node};
-use libp2p::{kad::Quorum, multiaddr::Protocol, Multiaddr};
+use libp2p_rs::{multiaddr::Protocol, multiaddr::Multiaddr};
 use multihash::Sha2_256;
 use tokio::time::timeout;
 
@@ -34,7 +34,7 @@ async fn find_peer_local() {
 #[cfg(all(not(feature = "test_go_interop"), not(feature = "test_js_interop")))]
 async fn spawn_bootstrapped_nodes(n: usize) -> (Vec<Node>, Option<ForeignNode>) {
     // fire up `n` nodes
-    let nodes = spawn_nodes(n, Topology::None).await;
+    let mut nodes = spawn_nodes(n, Topology::None).await;
 
     // register the nodes' addresses so they can bootstrap against
     // one another in a chain; node 0 is only aware of the existence
@@ -50,8 +50,8 @@ async fn spawn_bootstrapped_nodes(n: usize) -> (Vec<Node>, Option<ForeignNode>) 
             (nodes[n - 2].id, nodes[n - 2].addrs[0].clone())
         };
 
-        nodes[i].add_peer(next_id, next_addr).await.unwrap();
-        nodes[i].bootstrap().await.unwrap();
+        nodes[i].add_peer(next_id, next_addr).await;
+        nodes[i].bootstrap().await;
     }
 
     // make sure that the nodes are not actively connected to each other
@@ -74,7 +74,7 @@ async fn spawn_bootstrapped_nodes(n: usize) -> (Vec<Node>, Option<ForeignNode>) 
     let foreign_node = ForeignNode::new();
 
     // exclude one node to make room for the intermediary foreign node
-    let nodes = spawn_nodes(n - 1, Topology::None).await;
+    let mut nodes = spawn_nodes(n - 1, Topology::None).await;
 
     // skip the last index again, as there is a foreign node without one bound to it
     for i in 0..(n - 1) {
@@ -183,14 +183,13 @@ async fn dht_get_put() {
     let last_index = CHAIN_LEN - if foreign_node.is_none() { 1 } else { 2 };
 
     let (key, value) = (b"key".to_vec(), b"value".to_vec());
-    let quorum = Quorum::One;
 
     // the last node puts a key+value record
     nodes[last_index]
-        .dht_put(key.clone(), value.clone(), quorum)
+        .dht_put(key.clone(), value.clone())
         .await
         .unwrap();
 
     // and the first node should be able to get it
-    assert_eq!(nodes[0].dht_get(key, quorum).await.unwrap(), vec![value]);
+    assert_eq!(nodes[0].dht_get(key).await.unwrap(), value);
 }

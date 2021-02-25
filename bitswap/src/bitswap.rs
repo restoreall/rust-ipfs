@@ -167,8 +167,8 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
                 log::debug!("{:?} connected", p);
                 // make a ledge for the peer and send wantlist to it
                 let ledger = Ledger::new();
-                self.connected_peers.insert(p.clone(), ledger);
-                self.stats.entry(p.clone()).or_default();
+                self.connected_peers.insert(p, ledger);
+                self.stats.entry(p).or_default();
                 self.send_want_list(p);
             }
             Some(ProtocolEvent::DeadPeer(p)) => {
@@ -242,7 +242,7 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
 
         for block in &blocks {
             // publish block to all pending API users
-            self.wanted_blocks.remove(&block.cid).map(|txs| {
+            let _ = self.wanted_blocks.remove(&block.cid).map(|txs| {
                 txs.into_iter().for_each(|tx| {
                     // some tx may be dropped, regardless
                     log::debug!("wake up API client with {:?} from {:?}", block.cid, source);
@@ -351,7 +351,7 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
         task::spawn(async move {
             let r = task::timeout(deadline, rx).await;
             if let Ok(block) = r {
-                let _ = reply.send(block.map_err(|e| BitswapError::Cancel(e)));
+                let _ = reply.send(block.map_err(BitswapError::Cancel));
             } else {
                 let _ = reply.send(Err(BitswapError::Timeout));
             }
@@ -427,7 +427,7 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
             // FIXME: we should shard these across all of our peers by some logic; also, peers may
             // have been discovered to provide some specific wantlist item
             let mut message = Message::default();
-            for (cid, _) in &self.wanted_blocks {
+            for cid in self.wanted_blocks.keys() {
                 // TODO: set priority
                 message.want_block(cid, 1);
             }

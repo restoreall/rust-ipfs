@@ -28,7 +28,7 @@ pub(crate) fn cli_block_commands<'a>() -> Command<'a> {
 }
 
 fn cli_get_block(app: &App, args: &[&str]) -> XcliResult {
-    if args.len() < 1 {
+    if args.is_empty() {
         return Err(XcliError::MismatchArgument(1, args.len()));
     }
 
@@ -51,7 +51,7 @@ fn cli_get_block(app: &App, args: &[&str]) -> XcliResult {
 }
 
 fn cli_put_block(app: &App, args: &[&str]) -> XcliResult {
-    if args.len() < 1 {
+    if args.is_empty() {
         return Err(XcliError::MismatchArgument(1, args.len()));
     }
 
@@ -59,7 +59,7 @@ fn cli_put_block(app: &App, args: &[&str]) -> XcliResult {
     let block = args[0].as_bytes();
     let cid = Cid::new_v1(cid::Codec::Raw, Sha2_256::digest(block));
     let block = Block {
-        cid: cid.clone(),
+        cid,
         data: block.into(),
     };
 
@@ -75,7 +75,7 @@ fn cli_put_block(app: &App, args: &[&str]) -> XcliResult {
 }
 
 fn cli_remove_block(app: &App, args: &[&str]) -> XcliResult {
-    if args.len() < 1 {
+    if args.is_empty() {
         return Err(XcliError::MismatchArgument(1, args.len()));
     }
 

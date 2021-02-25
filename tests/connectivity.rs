@@ -1,5 +1,5 @@
 use ipfs::Node;
-use libp2p::{multiaddr::Protocol, Multiaddr};
+use libp2p_rs::multiaddr::{Protocol, Multiaddr};
 use std::time::Duration;
 use tokio::time::timeout;
 
@@ -47,13 +47,12 @@ async fn dont_connect_without_p2p() {
 #[ignore = "connecting just by PeerId is not currently supported"]
 #[tokio::test]
 async fn connect_two_nodes_by_peer_id() {
-    let node_a = Node::new("a").await;
+    let mut node_a = Node::new("a").await;
     let node_b = Node::new("b").await;
 
     node_a
         .add_peer(node_b.id, node_b.addrs[0].clone())
-        .await
-        .unwrap();
+        .await;
     let b_id_multiaddr: Multiaddr = format!("/p2p/{}", &node_b.id).parse().unwrap();
 
     timeout(TIMEOUT, node_a.connect(b_id_multiaddr))
@@ -82,12 +81,9 @@ async fn connect_duplicate_multiaddr() {
 #[tokio::test]
 async fn connect_two_nodes_with_two_connections_doesnt_panic() {
     let node_a = Node::new("a").await;
-    let node_b = Node::new("b").await;
+    let mut node_b = Node::new("b").await;
 
-    node_a
-        .add_listening_address("/ip4/127.0.0.1/tcp/0".parse().unwrap())
-        .await
-        .unwrap();
+    node_b.addrs = vec!["/ip4/127.0.0.1/tcp/1".parse().unwrap()];
 
     let addresses = node_a.addrs_local().await.unwrap();
     assert_eq!(addresses.len(), 2);

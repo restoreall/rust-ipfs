@@ -91,7 +91,11 @@ pub use bitswap::BsBlockStore;
 
 pub use libp2p_rs::{
     core::{
-        multiaddr::multiaddr, multiaddr::Protocol, Multiaddr, PeerId, PublicKey, identity::Keypair, identity::secp256k1
+        multiaddr::multiaddr,
+        multiaddr::Protocol,
+        Multiaddr, PeerId, PublicKey,
+        identity::Keypair, identity::secp256k1,
+        identity::rsa
     },
     kad::record::Key,
 };
@@ -330,7 +334,7 @@ impl<Types: IpfsTypes> UninitializedIpfs<Types> {
             span: facade_span,
             repo,
             keys: DebuggableKeypair(keys),
-            controls: controls.clone(),
+            controls,
         };
 
         Ok(ipfs)
@@ -631,7 +635,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
         let mut addrs = Vec::with_capacity(peers.len());
 
         for peer_id in peers.into_iter() {
-            let peer_addrs = self.controls.swarm().get_addrs(&peer_id).unwrap_or(vec![]);
+            let peer_addrs = self.controls.swarm().get_addrs(&peer_id).unwrap_or_default();
             addrs.push((peer_id, peer_addrs));
         }
         Ok(addrs)
@@ -1009,7 +1013,7 @@ mod node {
         }
 
         /// Connects to a peer at the given address.
-        pub async fn connect(&mut self, addr: Multiaddr) -> Result<(), Error> {
+        pub async fn connect(&self, addr: Multiaddr) -> Result<(), Error> {
             let addr = MultiaddrWithPeerId::try_from(addr).unwrap();
             self.ipfs.connect(addr).await
         }

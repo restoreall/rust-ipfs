@@ -50,7 +50,7 @@ async fn main() {
 
     // UninitializedIpfs will handle starting up the repository and return the facade (ipfs::Ipfs)
     // and the background task (ipfs::IpfsFuture).
-    let mut ipfs: Ipfs<TestTypes> = UninitializedIpfs::new(opts).start().await.unwrap();
+    let ipfs: Ipfs<TestTypes> = UninitializedIpfs::new(opts).start().await.unwrap();
 
     if bootstrappers == BootstrapperOption::RestoreDefault {
         // applications wishing to find content on the global IPFS swarm should restore the latest

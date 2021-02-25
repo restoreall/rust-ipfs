@@ -141,7 +141,7 @@ impl TryFrom<Multiaddr> for MultiaddrWithPeerId {
 
             let multiaddr = MultiaddrWithoutPeerId(
                 multiaddr
-                    .into_iter()
+                    .iter()
                     .filter(|p| !matches!(p, Protocol::P2p(_) | Protocol::P2pCircuit))
                     .collect(),
             );
@@ -217,7 +217,7 @@ pub(crate) fn could_be_bound_from_ephemeral(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use libp2p::build_multiaddr;
+    use libp2p_rs::core::multiaddr::multiaddr as build_multiaddr;
 
     #[test]
     fn connection_targets() {

@@ -1,4 +1,3 @@
-use std::num::NonZeroU16;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -12,11 +11,8 @@ extern crate tracing;
 #[derive(Debug, StructOpt)]
 enum Options {
     /// Should initialize the repository (create directories and such). `js-ipfsd-ctl` calls this
-    /// with two arguments by default, `--bits 1024` and `--profile test`.
+    /// with an argument by `--profile test`.
     Init {
-        /// Generated key length
-        #[structopt(long)]
-        bits: NonZeroU16,
         /// List of configuration profiles to apply. Currently only the `Test` and `Default`
         /// profiles are supported.
         ///
@@ -64,7 +60,7 @@ fn main() {
     let config_path = home.join("config");
 
     let config = match opts {
-        Options::Init { bits, profile } => {
+        Options::Init {  profile } => {
             println!("initializing IPFS node at {:?}", home);
 
             if config_path.is_file() {
@@ -73,7 +69,7 @@ fn main() {
                 std::process::exit(1);
             }
 
-            let result = config::init(&home, bits, profile);
+            let result = config::init(&home, profile);
 
             match result {
                 Ok(peer_id) => {

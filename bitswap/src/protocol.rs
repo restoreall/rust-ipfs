@@ -85,7 +85,7 @@ impl ProtocolHandler for Handler {
 // Sends bitswap message to remote peer.
 pub(crate) async fn send_message(mut swarm: SwarmControl, peer_id: PeerId, message: Message) -> Result<(), Box<dyn Error>> {
     log::debug!("sending message to {:?}...", peer_id);
-    let mut stream = swarm.new_stream(peer_id.clone(), vec![BS_PROTO_ID.into()]).await?;
+    let mut stream = swarm.new_stream(peer_id, vec![BS_PROTO_ID.into()]).await?;
     stream.write_one(message.to_bytes().as_ref()).await?;
     Ok(())
 }

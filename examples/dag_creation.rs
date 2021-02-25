@@ -1,6 +1,5 @@
 use futures::join;
 use ipfs::{make_ipld, Ipfs, IpfsOptions, IpfsPath, TestTypes, UninitializedIpfs};
-use tokio::task;
 
 #[tokio::main]
 async fn main() {

@@ -15,7 +15,6 @@ use serde::{Deserialize, Serialize};
 
 use tokio::sync::{broadcast, Mutex};
 use tokio::time::timeout;
-use tokio_stream::StreamExt;
 
 use ipfs::{Ipfs, IpfsTypes};
 

@@ -22,7 +22,7 @@ pub(crate) fn cli_dag_commands<'a>() -> Command<'a> {
 }
 
 fn cli_dag_get(app: &App, args: &[&str]) -> XcliResult {
-    if args.len() < 1 {
+    if args.is_empty() {
         return Err(XcliError::MismatchArgument(1, args.len()));
     }
 
@@ -40,7 +40,7 @@ fn cli_dag_get(app: &App, args: &[&str]) -> XcliResult {
 }
 
 fn cli_dag_put(app: &App, args: &[&str]) -> XcliResult {
-    if args.len() < 1 {
+    if args.is_empty() {
         return Err(XcliError::MismatchArgument(1, args.len()));
     }
 
