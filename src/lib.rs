@@ -91,7 +91,7 @@ pub use bitswap::BsBlockStore;
 
 pub use libp2p_rs::{
     core::{
-        multiaddr::multiaddr, multiaddr::Protocol, Multiaddr, PeerId, PublicKey, identity::Keypair,
+        multiaddr::multiaddr, multiaddr::Protocol, Multiaddr, PeerId, PublicKey, identity::Keypair, identity::secp256k1
     },
     kad::record::Key,
 };

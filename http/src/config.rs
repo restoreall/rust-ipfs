@@ -1,6 +1,6 @@
 //! go-ipfs compatible configuration file handling and setup.
 
-use ipfs::{multiaddr, Multiaddr};
+use ipfs::{multiaddr, Multiaddr, secp256k1, Keypair};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::num::NonZeroU16;
@@ -77,32 +77,38 @@ pub fn init(
         return Err(InitializationError::InvalidRsaKeyLength(bits));
     }
 
-    let pk = openssl::rsa::Rsa::generate(bits as u32)
-        .map_err(|e| InitializationError::KeyGeneration(Box::new(e)))?;
+    let inner_kpair = secp256k1::Keypair::generate();
+    let kp = inner_kpair.clone();
+    let private = kp.secret();
 
-    // sadly the pkcs8 to der functions are not yet exposed via the nicer interface
-    // https://github.com/sfackler/rust-openssl/issues/880
-    let pkcs8 = openssl::pkey::PKey::from_rsa(pk.clone())
-        .and_then(|pk| pk.private_key_to_pem_pkcs8())
-        .map_err(|e| InitializationError::KeyGeneration(Box::new(e)))?;
+    let keypair = Keypair::Secp256k1(inner_kpair);
 
-    let mut pkcs8 = pem_to_der(&pkcs8);
+    // let pk = openssl::rsa::Rsa::generate(bits as u32)
+    //     .map_err(|e| InitializationError::KeyGeneration(Box::new(e)))?;
+    //
+    // // sadly the pkcs8 to der functions are not yet exposed via the nicer interface
+    // // https://github.com/sfackler/rust-openssl/issues/880
+    // let pkcs8 = openssl::pkey::PKey::from_rsa(pk.clone())
+    //     .and_then(|pk| pk.private_key_to_pem_pkcs8())
+    //     .map_err(|e| InitializationError::KeyGeneration(Box::new(e)))?;
+    //
+    // let mut pkcs8 = pem_to_der(&pkcs8);
+    //
+    // let kp = ipfs::Keypair::rsa_from_pkcs8(&mut pkcs8)
+    //     .expect("Failed to turn pkcs#8 into libp2p::identity::Keypair");
 
-    let kp = ipfs::Keypair::rsa_from_pkcs8(&mut pkcs8)
-        .expect("Failed to turn pkcs#8 into libp2p::identity::Keypair");
-
-    let peer_id = kp.public().into_peer_id().to_string();
+    let peer_id = keypair.public().into_peer_id().to_string();
 
     // TODO: this part could be PR'd to rust-libp2p as they already have some public key
     // import/export but probably not if ring does not support these required conversions.
 
-    let pkcs1 = pk
-        .private_key_to_der()
-        .map_err(|e| InitializationError::KeyGeneration(Box::new(e)))?;
+    // let pkcs1 = pk
+    //     .private_key_to_der()
+    //     .map_err(|e| InitializationError::KeyGeneration(Box::new(e)))?;
 
     let key_desc = keys_proto::PrivateKey {
-        r#type: keys_proto::KeyType::Rsa as i32,
-        data: pkcs1,
+        r#type: keys_proto::KeyType::Secp256k1 as i32,
+        data: private.to_bytes().to_vec(),
     };
 
     let private_key = {
@@ -313,18 +319,11 @@ impl Identity {
             .map_err(|e| LoadingError::PrivateKeyLoadingFailed(Box::new(e)))?;
 
         Ok(match KeyType::from_i32(private_key.r#type) {
-            Some(KeyType::Rsa) => {
-                let pk = openssl::rsa::Rsa::private_key_from_der(&private_key.data)
+            Some(KeyType::Secp256k1) => {
+                let pk = secp256k1::SecretKey::from_bytes(private_key.data.to_vec())
                     .map_err(|e| LoadingError::PrivateKeyLoadingFailed(Box::new(e)))?;
 
-                let pkcs8 = openssl::pkey::PKey::from_rsa(pk)
-                    .and_then(|pk| pk.private_key_to_pem_pkcs8())
-                    .map_err(|e| LoadingError::PrivateKeyLoadingFailed(Box::new(e)))?;
-
-                let mut pkcs8 = pem_to_der(&pkcs8);
-
-                ipfs::Keypair::rsa_from_pkcs8(&mut pkcs8)
-                    .map_err(|e| LoadingError::PrivateKeyLoadingFailed(Box::new(e)))?
+                Keypair::Secp256k1(secp256k1::Keypair::from(pk))
             }
             _keytype => return Err(LoadingError::UnsupportedPrivateKeyType(private_key.r#type)),
         })
