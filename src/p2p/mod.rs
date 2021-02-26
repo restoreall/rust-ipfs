@@ -8,13 +8,11 @@ pub(crate) mod addr;
 pub(crate) mod pubsub;
 mod swarm;
 
-
-
 pub use addr::{MultiaddrWithPeerId, MultiaddrWithoutPeerId};
 pub use {swarm::Connection};
 
 use libp2p_rs::core::identity::Keypair;
-use libp2p_rs::core::{Multiaddr, PeerId, ProtocolId};
+use libp2p_rs::core::{Multiaddr, PeerId, ProtocolId, Transport};
 
 use libp2p_rs::swarm::{Control as SwarmControl, Swarm};
 use libp2p_rs::kad::Control as KadControl;
@@ -35,7 +33,7 @@ use libp2p_rs::{noise, yamux, mplex, secio};
 use libp2p_rs::core::upgrade::Selector;
 use libp2p_rs::core::transport::upgrade::TransportUpgrade;
 use libp2p_rs::tcp::TcpConfig;
-//use libp2p_rs::dns::DnsConfig;
+use libp2p_rs::dns::DnsConfig;
 
 /// Libp2p Network controllers.
 pub struct Controls {
@@ -101,9 +99,9 @@ impl Controls {
         let sec_noise = noise::NoiseConfig::xx(xx_keypair, options.keypair.clone());
         let sec = Selector::new(sec_noise, sec_secio);
 
-        // FIXME: timeout & DnsConfig
         let mux = Selector::new(yamux::Config::new(), mplex::Config::new());
-        let tu = TransportUpgrade::new(TcpConfig::new().nodelay(true), mux, sec);//.timeout(Duration::from_secs(20));
+        let tu = TransportUpgrade::new(
+            DnsConfig::new(TcpConfig::new().nodelay(true).outbound_timeout(Duration::from_secs(20))), mux, sec);
 
         // Make swarm
         let mut swarm = Swarm::new(options.keypair.public())
