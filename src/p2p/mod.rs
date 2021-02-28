@@ -65,7 +65,7 @@ pub struct SwarmOptions {
     /// Bound listening addresses; by default the node will not listen on any address.
     pub listening_addrs: Vec<Multiaddr>,
     /// The peers to connect to on startup.
-    pub bootstrap: Vec<(Multiaddr, PeerId)>,
+    pub bootstrap: Vec<(PeerId, Multiaddr)>,
     /// Enables mdns for peer discovery and announcement when true.
     pub mdns: bool,
     /// Custom Kademlia protocol name, see [`IpfsOptions::kad_protocol`].
@@ -155,10 +155,9 @@ impl Controls {
         swarm.start();
 
         // handle bootstrap nodes
-        for (addr, peer_id) in options.bootstrap {
-            kad_control.add_node(peer_id, vec![addr]).await;
+        if !options.bootstrap.is_empty() {
+            kad_control.bootstrap(options.bootstrap.clone()).await;
         }
-        kad_control.bootstrap().await;
 
         Controls {
             swarm: swarm_control,

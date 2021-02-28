@@ -11,8 +11,8 @@ async fn main() {
     let mut opts = IpfsOptions::inmemory_with_generated_keys();
 
     opts.listening_addrs.push("/ip4/0.0.0.0/tcp/8084".parse().unwrap());
-    //opts.bootstrap.push(("/ip4/104.131.131.82/tcp/4001".parse().unwrap(), "QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ".parse().unwrap()));
-    opts.bootstrap.push(("/ip4/127.0.0.1/tcp/4001".parse().unwrap(), "12D3KooWDsgzyxLH2fTrFeqxJrFxBz4uMEvw4gbR6yeAChSW6ELe".parse().unwrap()));
+    opts.bootstrap.push(("QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ".parse().unwrap(), "/ip4/104.131.131.82/tcp/4001".parse().unwrap()));
+    //opts.bootstrap.push(("12D3KooWDsgzyxLH2fTrFeqxJrFxBz4uMEvw4gbR6yeAChSW6ELe".parse().unwrap(), "/ip4/127.0.0.1/tcp/4001".parse().unwrap()));
 
     let ipfs: Ipfs<TestTypes> = UninitializedIpfs::new(opts).start().await.unwrap();
 

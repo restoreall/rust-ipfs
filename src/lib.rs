@@ -144,7 +144,7 @@ pub struct IpfsOptions {
     pub keypair: Keypair,
 
     /// Nodes used as bootstrap peers.
-    pub bootstrap: Vec<(Multiaddr, PeerId)>,
+    pub bootstrap: Vec<(PeerId, Multiaddr)>,
 
     /// Enables mdns for peer discovery and announcement when true.
     pub mdns: bool,
@@ -602,7 +602,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
     /// Assumes the bootstrap nodes have been added to the routing table already.
     /// Check [SwarmOptions::bootstrap] for details.
     pub async fn bootstrap(&self) {
-        self.controls.kad().bootstrap().await;
+        self.controls.kad().bootstrap(vec![]).await;
     }
 
     /// Connects to the peer at the given Multiaddress.
@@ -1041,7 +1041,7 @@ mod node {
         /// ran with random keys so that the buckets farther from the closest neighbor also
         /// get refreshed.
         pub async fn bootstrap(&mut self) {
-            self.controls.kad_mut().bootstrap().await;
+            self.controls.kad_mut().bootstrap(vec![]).await;
         }
 
         /// Add a known listen address of a peer participating in the DHT to the routing table.

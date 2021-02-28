@@ -328,12 +328,13 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
         let mut swarm = self.swarm.clone().expect("Swarm??");
         let key = cid.to_bytes();
         task::spawn(async move {
-            let r = routing.find_providers(key, 1).await;
+            let r = routing.find_providers(key, 2).await;
+            log::info!("want_block find_providers: {:?}", r);
             if let Ok(peers) = r {
                 // open a connection toward the providers, so that bitswap could be happy
                 // to fetch the wanted blocks
                 for peer in peers {
-                    let _ = swarm.new_connection_no_routing(peer).await;
+                    let _ = swarm.new_connection(peer).await;
                 }
             }
         });
@@ -373,7 +374,8 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
         // announce via routing
         let mut routing = self.routing.clone();
         task::spawn(async move {
-            let _ = routing.provide(cid.to_bytes()).await;
+            let r = routing.provide(cid.to_bytes()).await;
+            log::info!("cid {} announced: {:?}", cid, r)
         });
 
         let _ = reply.send(Ok(()));
