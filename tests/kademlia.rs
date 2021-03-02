@@ -51,7 +51,7 @@ async fn spawn_bootstrapped_nodes(n: usize) -> (Vec<Node>, Option<ForeignNode>) 
         };
 
         nodes[i].add_peer(next_id, next_addr).await;
-        nodes[i].bootstrap().await;
+        nodes[i].bootstrap().await.unwrap();
     }
 
     // make sure that the nodes are not actively connected to each other
