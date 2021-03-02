@@ -1040,8 +1040,10 @@ mod node {
         /// known in order for the process to succeed. Subsequently, additional queries are
         /// ran with random keys so that the buckets farther from the closest neighbor also
         /// get refreshed.
-        pub async fn bootstrap(&mut self) {
-            self.controls.kad_mut().bootstrap(vec![]).await;
+        pub async fn bootstrap(&mut self) -> Result<(), Error> {
+            self.controls.kad_mut().bootstrap_wait(vec![])
+                .await
+                .map_err(Error::from)
         }
 
         /// Add a known listen address of a peer participating in the DHT to the routing table.
