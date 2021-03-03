@@ -386,6 +386,19 @@ impl<Types: IpfsTypes> Ipfs<Types> {
         }
     }
 
+    pub async fn put_block_now(&self, block: Block) -> Result<Cid, Error> {
+        let (cid, res) = self.repo
+            .put_block(block)
+            .instrument(self.span.clone())
+            .await?;
+
+        Ok(cid)
+    }
+
+    pub async fn get_block_now(&self, cid: &Cid) -> Result<Option<Block>, Error> {
+        self.repo.get_block(cid).instrument(self.span.clone()).await
+    }
+
     /// Remove block from the ipfs repo. A pinned block cannot be removed.
     pub async fn remove_block(&self, cid: Cid) -> Result<Cid, Error> {
         self.repo
