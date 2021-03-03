@@ -114,16 +114,22 @@ fn cli_get(app: &App, args: &[&str]) -> XcliResult {
 
     let mut walker = Walker::new(cid, "".to_string());
 
-    executor::block_on(async {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    rt.block_on(async {
         while walker.should_continue() {
             let (cid, _) = walker.pending_links();
 
             let tmp_cid = cid.clone();
 
+            println!("fetching cid {}...", cid);
+
             let ipld_block = ipfs.get_block(cid).await.unwrap_or_else(|e| {
                 println!("Failed to get block {}: {:?}", cid, e);
                 exit(1);
             });
+
+            println!("fetching cid {} done", cid);
 
             match walker
                 .next(&ipld_block.into_vec(), &mut cache)
