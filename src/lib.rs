@@ -387,7 +387,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
     }
 
     pub async fn put_block_now(&self, block: Block) -> Result<Cid, Error> {
-        let (cid, res) = self.repo
+        let (cid, _res) = self.repo
             .put_block(block)
             .instrument(self.span.clone())
             .await?;

@@ -152,10 +152,15 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
         match evt {
             Some(ProtocolEvent::Blocks(peer, blocks)) => {
                 log::debug!("blockstore reports {} block(s) for {:?}", blocks.len(), peer);
-                let ledger = self
+                let ledger = if let Some(l) = self
                     .connected_peers
-                    .get_mut(&peer)
-                    .expect("Peer without ledger?!");
+                    .get_mut(&peer){
+                    l
+                } else {
+                    log::info!("got incoming message from {:?} without ledge", peer);
+                    return;
+                };
+
                 //self.s
                 blocks.into_iter().for_each(|block| ledger.add_block(block));
 
@@ -189,10 +194,14 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
 
         let current_wantlist = self.local_wantlist();
 
-        let ledger = self
+        let ledger = if let Some(l) = self
             .connected_peers
-            .get_mut(&source)
-            .expect("Peer without ledger?!");
+            .get_mut(&source) {
+            l
+        } else {
+            log::info!("got incoming message from {:?} without ledge", source);
+            return;
+        };
 
         // Process the incoming cancel list.
         for cid in message.cancel() {
@@ -326,10 +335,11 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
         // TODO: should run a dedicated peer manager for find_providers...
         let mut routing = self.routing.clone();
         let mut swarm = self.swarm.clone().expect("Swarm??");
-        let key = cid.to_bytes();
+        let cid_clone = cid.clone();
         task::spawn(async move {
+            let key = cid_clone.to_bytes();
             let r = routing.find_providers(key, 2).await;
-            log::info!("want_block find_providers: {:?}", r);
+            log::debug!("want_block find_providers: {} got {:?}", cid_clone, r);
             if let Ok(peers) = r {
                 // open a connection toward the providers, so that bitswap could be happy
                 // to fetch the wanted blocks
