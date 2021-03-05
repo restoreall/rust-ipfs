@@ -14,18 +14,6 @@ async fn subscribe_only_once() {
 }
 
 #[tokio::test]
-async fn resubscribe_after_unsubscribe() {
-    let a = Node::new("test_node").await;
-
-    let mut stream = a.pubsub_subscribe("topic".into()).await.unwrap();
-    a.pubsub_unsubscribe("topic").await.unwrap();
-    // sender has been dropped
-    assert_eq!(stream.next().await, None);
-
-    drop(a.pubsub_subscribe("topic".into()).await.unwrap());
-}
-
-#[tokio::test]
 async fn unsubscribe_via_drop() {
     let a = Node::new("test_node").await;
 
@@ -50,6 +38,7 @@ async fn can_publish_without_subscribing() {
 #[allow(clippy::mutable_key_type)] // clippy doesn't like Vec inside HashSet
 async fn publish_between_two_nodes() {
     use std::collections::HashSet;
+    // env_logger::builder().filter_level(LevelFilter::Info).init();
 
     let nodes = spawn_nodes(2, Topology::Line).await;
 
@@ -104,17 +93,16 @@ async fn publish_between_two_nodes() {
     .map(|(topics, id, data)| (topics.to_vec(), *id, data.to_vec()))
     .collect::<HashSet<_>>();
 
-    for st in &mut [b_msgs.next().await, a_msgs.next().await] {
-        let actual = st
-            .take()
-            // Arc::try_unwrap will fail sometimes here as the sender side in src/p2p/pubsub.rs:305
-            // can still be looping
-            .iter()
-            .map(|msg| (*msg).clone())
-            .map(|msg| (msg.topics.clone(), msg.source, msg.data.clone()))
-            .collect::<HashSet<_>>();
-        assert_eq!(expected, actual);
-    }
+    let mut actual = HashSet::new();
+
+    let a = a_msgs.next().await
+        .map(|msg|(msg.topics.clone(), msg.source, msg.data.clone())).unwrap();
+    let b = b_msgs.next().await
+        .map(|msg|(msg.topics.clone(), msg.source, msg.data.clone())).unwrap();
+
+    actual.insert(b);
+    actual.insert(a);
+    assert_eq!(expected, actual);
 
     drop(b_msgs);
 

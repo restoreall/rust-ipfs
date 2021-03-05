@@ -46,6 +46,56 @@ fn cli_add(app: &App, args: &[&str]) -> XcliResult {
     Ok(CmdExeCode::Ok)
 }
 
+// fn cli_add(app: &App, args: &[&str]) -> XcliResult {
+//     if args.is_empty() {
+//         return Err(XcliError::MismatchArgument(1, args.len()));
+//     }
+//
+//     let f = File::open(args[0]).map_err(|e| XcliError::BadArgument(e.to_string()))?;
+//
+//     // let ipfs = handler(app);
+//
+//     let mut adder = FileAdder::default();
+//     // let _ = adder.push(args[0].as_bytes());
+//
+//     let mut stdin = BufReader::with_capacity(adder.size_hint(), f);
+//
+//     let mut input = 0;
+//
+//     executor::block_on(async {
+//         loop {
+//             match stdin.fill_buf().unwrap() {
+//                 x if x.is_empty() => {
+//                     eprintln!("finishing");
+//                     let blocks = adder.finish();
+//                     for block in blocks {
+//                         log::info!("Cid: {}", block.0.to_string());
+//                     }
+//                     break;
+//                 }
+//                 x => {
+//                     let mut total = 0;
+//
+//                     while total < x.len() {
+//                         let (blocks, consumed) = adder.push(&x[total..]);
+//                         for block in blocks {
+//                             log::info!("Cid: {}", block.0.to_string());
+//                         }
+//
+//                         input += consumed;
+//                         total += consumed;
+//                     }
+//
+//                     assert_eq!(total, x.len());
+//                     stdin.consume(total);
+//                 }
+//             }
+//         }
+//     });
+//
+//     Ok(CmdExeCode::Ok)
+// }
+
 pub(crate) fn cli_cat_commands<'a>() -> Command<'a> {
     Command::new_with_alias("cat", "c")
         .about("Show IPFS object data")
@@ -109,7 +159,7 @@ fn cli_get(app: &App, args: &[&str]) -> XcliResult {
     let ipfs = handler(app);
 
     let cid = Cid::try_from(args[0]).map_err(|e| {
-       BadArgument(e.to_string())
+        BadArgument(e.to_string())
     })?;
 
     let mut walker = Walker::new(cid, "".to_string());

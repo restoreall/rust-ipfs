@@ -95,7 +95,7 @@ pub use libp2p_rs::{
         multiaddr::Protocol,
         Multiaddr, PeerId, PublicKey,
         identity::Keypair, identity::secp256k1,
-        identity::rsa
+        identity::rsa,
     },
     kad::record::Key,
 };
@@ -108,6 +108,7 @@ impl<T: RepoTypes> IpfsTypes for T {}
 /// Default node configuration, currently with persistent block store and data store for pins.
 #[derive(Debug)]
 pub struct Types;
+
 impl RepoTypes for Types {
     type TBlockStore = repo::fs::FsBlockStore;
     #[cfg(feature = "sled_data_store")]
@@ -120,6 +121,7 @@ impl RepoTypes for Types {
 /// In-memory testing configuration used in tests.
 #[derive(Debug)]
 pub struct TestTypes;
+
 impl RepoTypes for TestTypes {
     type TBlockStore = repo::mem::MemBlockStore;
     type TDataStore = repo::mem::MemDataStore;
@@ -377,9 +379,8 @@ impl<Types: IpfsTypes> Ipfs<Types> {
     /// Retrieves a block from the local blockstore, or starts fetching from the network or join an
     /// already started fetch.
     pub async fn get_block(&self, cid: &Cid) -> Result<Block, Error> {
-        let block = self.repo.get_block(cid).instrument(self.span.clone()).await?;
 
-        if let Some(block) = block {
+        if let Some(block) = self.repo.get_block(cid).instrument(self.span.clone()).await? {
             Ok(block)
         } else {
             self.controls.bitswap().want_block(cid.clone(), 1).await.map_err(Error::from)
@@ -450,8 +451,8 @@ impl<Types: IpfsTypes> Ipfs<Types> {
                 self.repo.insert_recursive_pin(cid, st).await
             }
         }
-        .instrument(span)
-        .await
+            .instrument(span)
+            .await
     }
 
     /// Unpins a given Cid recursively or only directly.
@@ -491,8 +492,8 @@ impl<Types: IpfsTypes> Ipfs<Types> {
                 self.repo.remove_recursive_pin(cid, st).await
             }
         }
-        .instrument(span)
-        .await
+            .instrument(span)
+            .await
     }
 
     /// Checks whether a given block is pinned.
@@ -576,7 +577,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
         starting_point: impl Into<unixfs::StartingPoint>,
         range: Option<Range<u64>>,
     ) -> Result<
-        impl Stream<Item = Result<Vec<u8>, unixfs::TraversalFailed>> + Send + '_,
+        impl Stream<Item=Result<Vec<u8>, unixfs::TraversalFailed>> + Send + '_,
         unixfs::TraversalFailed,
     > {
         // convert early not to worry about the lifetime of parameter
@@ -606,8 +607,8 @@ impl<Types: IpfsTypes> Ipfs<Types> {
                 resolved
             }
         }
-        .instrument(self.span.clone())
-        .await
+            .instrument(self.span.clone())
+            .await
     }
 
     /// Bootstraps the Kad-DHT.
@@ -673,11 +674,11 @@ impl<Types: IpfsTypes> Ipfs<Types> {
             .into_iter()
             .map(|c| {
                 let addr = MultiaddrWithoutPeerId::try_from(c.info.ra)
-                            .expect("dialed address did not contain peerid in libp2p 0.34")
-                            .with(c.info.remote_peer_id);
+                    .expect("dialed address did not contain peerid in libp2p 0.34")
+                    .with(c.info.remote_peer_id);
                 Connection {
                     addr,
-                    rtt: None
+                    rtt: None,
                 }
             })
             .collect();
@@ -795,11 +796,16 @@ impl<Types: IpfsTypes> Ipfs<Types> {
     /// when it's finished, the newly added DHT records are checked for the existence of the desired
     /// `peer_id` and if it's there, the list of its known addresses is returned.
     pub async fn find_peer(&self, peer_id: PeerId) -> Result<Vec<Multiaddr>, Error> {
-        self.controls.kad().find_peer(&peer_id)
-            .instrument(self.span.clone())
-            .await
-            .map(|kad_peer| kad_peer.multiaddrs)
-            .map_err(Error::from)
+        if let Some(addr) = self.controls.swarm().get_addrs(&peer_id){
+            Ok(addr)
+        } else {
+            self.controls.kad().find_peer(&peer_id)
+                .instrument(self.span.clone())
+                .await
+                .map(|kad_peer| kad_peer.multiaddrs)
+                .map_err(Error::from)
+        }
+
     }
 
     /// Performs a DHT lookup for providers of a value to the given key.
@@ -809,7 +815,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
         self.controls.kad().find_providers(cid.to_bytes(), 1)
             .instrument(self.span.clone())
             .await
-            .map(|peers| peers.into_iter().map(|p|p.node_id).collect())
+            .map(|peers| peers.into_iter().map(|p| p.node_id).collect())
             .map_err(Error::from)
     }
 
@@ -839,7 +845,7 @@ impl<Types: IpfsTypes> Ipfs<Types> {
         self.controls.kad().lookup(peer_id.to_bytes().into())
             .instrument(self.span.clone())
             .await
-            .map(|peers| peers.into_iter().map(|p|p.node_id).collect())
+            .map(|peers| peers.into_iter().map(|p| p.node_id).collect())
             .map_err(Error::from)
     }
 
@@ -879,9 +885,9 @@ impl<Types: IpfsTypes> Ipfs<Types> {
         iplds: Iter,
         max_depth: Option<u64>,
         unique: bool,
-    ) -> impl Stream<Item = Result<refs::Edge, ipld::BlockError>> + Send + 'a
-    where
-        Iter: IntoIterator<Item = (Cid, Ipld)> + Send + 'a,
+    ) -> impl Stream<Item=Result<refs::Edge, ipld::BlockError>> + Send + 'a
+        where
+            Iter: IntoIterator<Item=(Cid, Ipld)> + Send + 'a,
     {
         refs::iplds_refs(self, iplds, max_depth, unique)
     }
@@ -943,7 +949,6 @@ impl<Types: IpfsTypes> Ipfs<Types> {
 
         self.exit_daemon().await;
     }
-
 }
 
 /// Bitswap statistics
@@ -1039,7 +1044,16 @@ mod node {
             // given span
 
             let ipfs = UninitializedIpfs::new(opts).start().await.unwrap();
-            let addrs = ipfs.identity().await.unwrap().1;
+            let (pub_key, addrs) = ipfs.identity().await.unwrap();
+
+            let pid = pub_key.into_peer_id();
+
+            let addrs = addrs
+                .into_iter()
+                .map(|mut i| {
+                    i.push(Protocol::P2p(*pid.as_ref()));
+                    i
+                }).collect();
 
             Node {
                 ipfs,

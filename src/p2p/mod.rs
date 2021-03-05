@@ -50,7 +50,7 @@ impl Clone for Controls {
             swarm: self.swarm.clone(),
             kad: self.kad.clone(),
             pubsub: self.pubsub.clone(),
-            bitswap: self.bitswap.clone()
+            bitswap: self.bitswap.clone(),
         }
     }
 }

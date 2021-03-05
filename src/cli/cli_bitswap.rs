@@ -58,6 +58,50 @@ fn cli_wl_bitswap(app: &App, args: &[&str]) -> XcliResult {
     Ok(CmdExeCode::Ok)
 }
 
+// fn cli_has_bitswap(app: &App, args: &[&str]) -> XcliResult {
+//     if args.len() == 1 {
+//         let cid = cid::Cid::try_from(args[0]).map_err(|e| XcliError::BadArgument(e.to_string()))?;
+//         let mut bitswap = handler(app);
+//
+//         executor::block_on(async {
+//             match bitswap.has_block(cid.clone()).await {
+//                 Ok(()) => {
+//                     println!("Has block {:?}.", cid);
+//                 }
+//                 Err(e) => {
+//                     println!("{:?}", e);
+//                 }
+//             }
+//         });
+//     } else {
+//         return Err(XcliError::BadArgument("Input is too long".to_string()))
+//     }
+//
+//     Ok(CmdExeCode::Ok)
+// }
+//
+// fn cli_cancel_bitswap(app: &App, args: &[&str]) -> XcliResult {
+//     if args.len() == 1 {
+//         let cid = cid::Cid::try_from(args[0]).map_err(|e| XcliError::BadArgument(e.to_string()))?;
+//         let mut bitswap = handler(app);
+//
+//         executor::block_on(async {
+//             match bitswap.cancel_block(cid).await {
+//                 Ok(()) => {
+//                     println!("Block has been cancel.");
+//                 }
+//                 Err(e) => {
+//                     println!("{:?}", e);
+//                 }
+//             }
+//         });
+//     } else {
+//         return Err(XcliError::BadArgument("Input is too long".to_string()))
+//     }
+//
+//     Ok(CmdExeCode::Ok)
+// }
+
 fn cli_stat_bitswap(app: &App, _args: &[&str]) -> XcliResult {
     let mut bitswap = handler(app);
     executor::block_on(async {

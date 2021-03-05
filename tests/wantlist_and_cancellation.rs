@@ -105,7 +105,7 @@ async fn wantlist_cancellation() {
     let cid_clone = cid.clone();
     let get_request3 = ipfs_clone.get_block(&cid_clone);
     let get_timeout = timeout(Duration::from_millis(100), pending::<()>());
-    let get_request3 = match select(get_timeout.boxed(), get_request3.boxed()).await {
+    let _get_request3 = match select(get_timeout.boxed(), get_request3.boxed()).await {
         Either::Left((_, fut)) => fut,
         Either::Right(_) => unreachable!(),
     };
@@ -152,8 +152,9 @@ async fn wantlist_cancellation() {
     // check_cid_subscriptions(&ipfs, &cid, 1).await;
 
     // cancel the second requested Cid
-    drop(get_request3);
+    // drop(get_request3);
 
+    let _ = ipfs.controls().bitswap().cancel_block(cid).await;
     // verify that the requested Cid is no longer in the wantlist
     let wantlist_cleared = bounded_retry(
         Duration::from_secs(1),

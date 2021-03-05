@@ -81,12 +81,10 @@ async fn connect_duplicate_multiaddr() {
 #[tokio::test]
 async fn connect_two_nodes_with_two_connections_doesnt_panic() {
     let node_a = Node::new("a").await;
-    let mut node_b = Node::new("b").await;
-
-    node_b.addrs = vec!["/ip4/127.0.0.1/tcp/1".parse().unwrap()];
+    let node_b = Node::new("b").await;
 
     let addresses = node_a.addrs_local().await.unwrap();
-    assert_eq!(addresses.len(), 2);
+    assert_eq!(addresses.len(), 1);
 
     for mut addr in addresses.into_iter() {
         addr.push(Protocol::P2p(node_a.id.into()));
