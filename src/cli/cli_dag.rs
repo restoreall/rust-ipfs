@@ -1,6 +1,6 @@
 use crate::cli::handler;
 use cid::Cid;
-use futures::executor;
+use libp2p_rs::runtime::task;
 use std::convert::TryFrom;
 use libp2p_rs::xcli::*;
 
@@ -29,7 +29,7 @@ fn cli_dag_get(app: &App, args: &[&str]) -> XcliResult {
     let ipfs = handler(app);
     let cid = Cid::try_from(args[0]).map_err(|e| XcliError::BadArgument(e.to_string()))?;
 
-    executor::block_on(async {
+    task::block_on(async {
         let r = ipfs.get_dag(cid.into()).await;
         if let Ok(data) = r {
             println!("{:?}", data);
@@ -47,7 +47,7 @@ fn cli_dag_put(app: &App, args: &[&str]) -> XcliResult {
     let ipfs = handler(app);
     let data = make_ipld!(args[0].as_bytes());
 
-    executor::block_on(async {
+    task::block_on(async {
         let r = ipfs.put_dag(data).await;
         if let Ok(cid) = r {
             println!("{} {:?}", cid, args[0]);

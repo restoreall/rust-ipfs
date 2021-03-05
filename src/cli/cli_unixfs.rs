@@ -2,7 +2,7 @@ use crate::cli::handler;
 use crate::unixfs::ll::walk::{ContinuedWalk, Walker};
 use crate::Cid;
 use crate::{Block, IpfsPath};
-use futures::{executor, pin_mut, stream::StreamExt};
+use futures::{pin_mut, stream::StreamExt};
 use ipfs_unixfs::file::adder::FileAdder;
 use std::convert::TryFrom;
 use std::fs::{DirBuilder, OpenOptions};
@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use std::process::exit;
 use libp2p_rs::xcli::*;
 use libp2p_rs::xcli::XcliError::BadArgument;
+use libp2p_rs::runtime::task;
 
 pub(crate) fn cli_add_commands<'a>() -> Command<'a> {
     Command::new_with_alias("add", "a")
@@ -29,7 +30,7 @@ fn cli_add(app: &App, args: &[&str]) -> XcliResult {
     let mut adder = FileAdder::default();
     let _ = adder.push(args[0].as_bytes());
 
-    executor::block_on(async {
+    task::block_on(async {
         for (cid, data) in adder.finish() {
             let len = data.len();
             let block = Block {
@@ -111,7 +112,7 @@ fn cli_cat(app: &App, args: &[&str]) -> XcliResult {
     let ipfs = handler(app);
     let path = IpfsPath::try_from(args[0]).map_err(|e| XcliError::BadArgument(e.to_string()))?;
 
-    executor::block_on(async {
+    task::block_on(async {
         let stream = ipfs.cat_unixfs(path, None).await.unwrap_or_else(|e| {
             println!("Error: {:?}", e);
             exit(1);
@@ -164,22 +165,16 @@ fn cli_get(app: &App, args: &[&str]) -> XcliResult {
 
     let mut walker = Walker::new(cid, "".to_string());
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-
-    rt.block_on(async {
+    task::block_on(async {
         while walker.should_continue() {
             let (cid, _) = walker.pending_links();
 
             let tmp_cid = cid.clone();
 
-            println!("fetching cid {}...", cid);
-
             let ipld_block = ipfs.get_block(cid).await.unwrap_or_else(|e| {
                 println!("Failed to get block {}: {:?}", cid, e);
                 exit(1);
             });
-
-            println!("fetching cid {} done", cid);
 
             match walker
                 .next(&ipld_block.into_vec(), &mut cache)

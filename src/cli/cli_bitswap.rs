@@ -1,4 +1,4 @@
-use futures::executor;
+use libp2p_rs::runtime::task;
 use libp2p_rs::core::PeerId;
 use std::str::FromStr;
 use libp2p_rs::xcli::*;
@@ -41,7 +41,7 @@ fn cli_wl_bitswap(app: &App, args: &[&str]) -> XcliResult {
     }
 
     let mut bitswap = handler(app);
-    executor::block_on(async {
+    task::block_on(async {
         let r = bitswap.wantlist(peer).await;
         match r {
             Ok(list) => {
@@ -104,7 +104,7 @@ fn cli_wl_bitswap(app: &App, args: &[&str]) -> XcliResult {
 
 fn cli_stat_bitswap(app: &App, _args: &[&str]) -> XcliResult {
     let mut bitswap = handler(app);
-    executor::block_on(async {
+    task::block_on(async {
         let r = bitswap.stats().await;
         if let Ok(st) = r {
             println!("{:?}", st);

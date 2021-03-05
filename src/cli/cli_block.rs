@@ -1,6 +1,6 @@
 use crate::{cli::handler, Block};
 use cid::Cid;
-use futures::executor;
+use libp2p_rs::runtime::task;
 use multihash::Sha2_256;
 use std::convert::TryFrom;
 use libp2p_rs::xcli::*;
@@ -35,7 +35,7 @@ fn cli_get_block(app: &App, args: &[&str]) -> XcliResult {
     let ipfs = handler(app);
     let cid = Cid::try_from(args[0]).map_err(|e| XcliError::BadArgument(e.to_string()))?;
 
-    executor::block_on(async {
+    task::block_on(async {
         let r = ipfs.get_block(&cid).await;
         match r {
             Ok(data) => {
@@ -63,7 +63,7 @@ fn cli_put_block(app: &App, args: &[&str]) -> XcliResult {
         data: block.into(),
     };
 
-    executor::block_on(async {
+    task::block_on(async {
         let r = ipfs.put_block(block).await;
         match r {
             Ok(cid) => println!("{}", cid),
@@ -82,7 +82,7 @@ fn cli_remove_block(app: &App, args: &[&str]) -> XcliResult {
     let ipfs = handler(app);
     let cid = Cid::try_from(args[0]).map_err(|e| XcliError::BadArgument(e.to_string()))?;
 
-    executor::block_on(async {
+    task::block_on(async {
         let r = ipfs.remove_block(cid).await;
         if let Ok(cid) = r {
             println!("{} is removed", cid);
