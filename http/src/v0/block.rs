@@ -1,5 +1,5 @@
 use crate::v0::support::{
-    try_only_named_multipart, with_ipfs, HandledErr, MaybeTimeoutExt, StreamResponse, StringError,
+    try_only_named_multipart, with_ipfs, HandledErr, MaybeTimeoutExt, StreamResponseJson, StringError,
     StringSerialized,
 };
 use bytes::Buf;
@@ -213,7 +213,7 @@ async fn rm_query<T: IpfsTypes>(
         });
 
     let st = futures::stream::iter(responses);
-    Ok(StreamResponse(st))
+    Ok(StreamResponseJson(st))
 }
 
 pub fn stat<T: IpfsTypes>(

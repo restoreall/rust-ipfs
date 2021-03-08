@@ -19,7 +19,7 @@ use format::EdgeFormatter;
 use ipfs::dag::ResolveError;
 pub use ipfs::path::IpfsPath;
 
-use crate::v0::support::{HandledErr, StreamResponse};
+use crate::v0::support::{HandledErr, StreamResponseJson};
 
 /// https://docs-beta.ipfs.io/reference/http/api/#api-v0-refs
 pub fn refs<T: IpfsTypes>(
@@ -94,7 +94,7 @@ async fn refs_inner<T: IpfsTypes>(
         }
     });
 
-    Ok(StreamResponse(st))
+    Ok(StreamResponseJson(st))
 }
 
 #[derive(Debug, Serialize, Deserialize)]

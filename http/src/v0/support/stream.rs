@@ -6,25 +6,43 @@ use warp::hyper::body::Bytes;
 use warp::hyper::Body;
 use warp::Reply;
 
-pub struct StreamResponse<S>(pub S);
+pub struct StreamResponseJson<S>(pub S);
+pub struct StreamResponseText<S>(pub S);
 
-impl<S> Reply for StreamResponse<S>
+impl<S> Reply for StreamResponseJson<S>
 where
     S: TryStream + Send + 'static,
     S::Ok: Into<Bytes>,
     S::Error: StdError + Send + Sync + 'static,
 {
     fn into_response(self) -> warp::reply::Response {
-        // while it may seem like the S::Error is handled somehow it currently just means the
-        // response will stop. hopefully later it can be used to become trailer headers.
-        let mut resp = Response::new(Body::wrap_stream(self.0.into_stream()));
-        let headers = resp.headers_mut();
-
-        // FIXME: unable to send this header with warp/hyper right now
-        headers.insert(TRAILER, HeaderValue::from_static("X-Stream-Error"));
-        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-        headers.insert("X-Chunked-Output", HeaderValue::from_static("1"));
-
-        resp
+        inner_into_response(self.0,"application/json")
     }
+
+}
+
+impl<S> Reply for StreamResponseText<S>
+where
+    S: TryStream + Send + 'static,
+    S::Ok: Into<Bytes>,
+    S::Error: StdError + Send + Sync + 'static,
+{
+    fn into_response(self) -> warp::reply::Response {
+        inner_into_response(self.0,"text/plain")
+    }
+
+}
+
+fn inner_into_response<S>(stream:S,content_type:&'static str)->warp::reply::Response
+where
+    S: TryStream + Send + 'static,
+    S::Ok: Into<Bytes>,
+    S::Error: StdError + Send + Sync + 'static,
+{
+    let mut resp = Response::new(Body::wrap_stream(stream.into_stream()));
+    let headers = resp.headers_mut();
+    headers.insert(TRAILER, HeaderValue::from_static("X-Stream-Error"));
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static(content_type));
+    headers.insert("X-Chunked-Output", HeaderValue::from_static("1"));
+    resp
 }

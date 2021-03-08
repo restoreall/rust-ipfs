@@ -7,7 +7,7 @@ use std::fmt;
 pub mod option_parsing;
 
 mod stream;
-pub use stream::StreamResponse;
+pub use stream::{StreamResponseJson,StreamResponseText};
 
 mod body;
 pub use body::{try_only_named_multipart, OnlyMultipartFailure};

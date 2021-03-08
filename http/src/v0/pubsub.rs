@@ -29,7 +29,7 @@ use warp::{Filter, Rejection};
 
 use crate::v0::support::{
     try_only_named_multipart, with_ipfs, NonUtf8Topic, OnlyMultipartFailure,
-    RequiredArgumentMissing, StreamResponse, StringError,
+    RequiredArgumentMissing, StreamResponseJson, StringError,
 };
 use mime::Mime;
 
@@ -110,7 +110,7 @@ pub fn subscribe<T: IpfsTypes>(
         .and(warp::any().map(move || pubsub.clone()))
         .and(warp::query::<TopicParameter>())
         .and_then(|ipfs, pubsub, TopicParameter { topic }| async move {
-            Ok::<_, warp::Rejection>(StreamResponse(inner_subscribe(ipfs, pubsub, topic).await))
+            Ok::<_, warp::Rejection>(StreamResponseJson(inner_subscribe(ipfs, pubsub, topic).await))
         })
 }
 

@@ -1,5 +1,5 @@
 use crate::v0::support::{
-    with_ipfs, MaybeTimeoutExt, StreamResponse, StringError, StringSerialized,
+    with_ipfs, MaybeTimeoutExt, StreamResponseText, StringError, StringSerialized,
 };
 use async_stream::try_stream;
 use bytes::Bytes;
@@ -83,8 +83,7 @@ async fn cat_inner<T: IpfsTypes>(ipfs: Ipfs<T>, args: CatArgs) -> Result<impl Re
         }
         Err(e) => return Err(StringError::from(e).into()),
     };
-
-    Ok(StreamResponse(stream))
+    Ok(StreamResponseText(stream))
 }
 
 #[derive(Deserialize)]
@@ -110,8 +109,7 @@ async fn get_inner<T: IpfsTypes>(ipfs: Ipfs<T>, args: GetArgs) -> Result<impl Re
         .await
         .map_err(StringError::from)?
         .map_err(StringError::from)?;
-
-    Ok(StreamResponse(walk(ipfs, block).into_stream()))
+        Ok(StreamResponseText(walk(ipfs, block).into_stream()))
 }
 
 async fn resolve_dagpb<T: IpfsTypes>(ipfs: &Ipfs<T>, path: IpfsPath) -> Result<Block, StringError> {

@@ -287,7 +287,7 @@ where
         }
     });
 
-    crate::v0::support::StreamResponse(st).into_response()
+    crate::v0::support::StreamResponseJson(st).into_response()
 }
 
 #[derive(Debug, Serialize)]

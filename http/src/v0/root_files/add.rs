@@ -57,7 +57,7 @@ pub(super) async fn add_inner<T: IpfsTypes>(
         }
     });
 
-    let body = crate::v0::support::StreamResponse(st);
+    let body = crate::v0::support::StreamResponseJson(st);
 
     Ok(body)
 }
