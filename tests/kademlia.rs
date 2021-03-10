@@ -1,6 +1,6 @@
 use cid::{Cid, Codec};
 use ipfs::{p2p::MultiaddrWithPeerId, Block, Node};
-use libp2p_rs::{multiaddr::Protocol, multiaddr::Multiaddr};
+use libp2p_rs::{multiaddr::Multiaddr, multiaddr::Protocol};
 use multihash::Sha2_256;
 use tokio::time::timeout;
 

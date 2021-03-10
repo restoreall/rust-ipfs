@@ -1,5 +1,5 @@
 use ipfs::Node;
-use libp2p_rs::multiaddr::{Protocol, Multiaddr};
+use libp2p_rs::multiaddr::{Multiaddr, Protocol};
 use std::time::Duration;
 use tokio::time::timeout;
 
@@ -50,9 +50,7 @@ async fn connect_two_nodes_by_peer_id() {
     let mut node_a = Node::new("a").await;
     let node_b = Node::new("b").await;
 
-    node_a
-        .add_peer(node_b.id, node_b.addrs[0].clone())
-        .await;
+    node_a.add_peer(node_b.id, node_b.addrs[0].clone()).await;
     let b_id_multiaddr: Multiaddr = format!("/p2p/{}", &node_b.id).parse().unwrap();
 
     timeout(TIMEOUT, node_a.connect(b_id_multiaddr))

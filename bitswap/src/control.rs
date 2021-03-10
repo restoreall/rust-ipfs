@@ -6,8 +6,8 @@ use libp2p_rs::core::PeerId;
 
 use crate::bitswap::ControlCommand;
 use crate::block::Block;
-use crate::{Priority, Stats};
 use crate::error::BitswapError;
+use crate::{Priority, Stats};
 
 #[derive(Clone)]
 pub struct Control(mpsc::UnboundedSender<ControlCommand>);
@@ -27,7 +27,11 @@ impl Control {
     /// Retrieves the wanted block.
     ///
     /// A user request
-    pub async fn want_block(&mut self, cid: Cid, _priority: Priority) -> Result<Block, BitswapError> {
+    pub async fn want_block(
+        &mut self,
+        cid: Cid,
+        _priority: Priority,
+    ) -> Result<Block, BitswapError> {
         let (tx, rx) = oneshot::channel();
         self.0.send(ControlCommand::WantBlock(cid, tx)).await?;
         rx.await?
@@ -54,7 +58,10 @@ impl Control {
     /// Returns the wantlist of local if peer is `None`, or the wantlst of the peer specified.
     ///
     /// A user request
-    pub async fn wantlist(&mut self, peer: Option<PeerId>) -> Result<Vec<(Cid, Priority)>, BitswapError> {
+    pub async fn wantlist(
+        &mut self,
+        peer: Option<PeerId>,
+    ) -> Result<Vec<(Cid, Priority)>, BitswapError> {
         let (tx, rx) = oneshot::channel();
         self.0.send(ControlCommand::WantList(peer, tx)).await?;
         rx.await?

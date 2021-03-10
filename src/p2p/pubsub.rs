@@ -1,4 +1,3 @@
-
 use libp2p_rs::core::PeerId;
 use libp2p_rs::floodsub::protocol::FloodsubMessage;
 use libp2p_rs::floodsub::subscription::Subscription;
@@ -39,13 +38,15 @@ impl From<FloodsubMessage> for PubsubMessage {
     }
 }
 
-
-  /// Stream of a pubsub messages.
+/// Stream of a pubsub messages.
 pub struct SubscriptionStream(Subscription);
 
 impl SubscriptionStream {
     pub async fn next(&mut self) -> Option<Arc<PubsubMessage>> {
-        self.0.next().await.map(|m|Arc::new(m.as_ref().clone().into()))
+        self.0
+            .next()
+            .await
+            .map(|m| Arc::new(m.as_ref().clone().into()))
     }
 }
 

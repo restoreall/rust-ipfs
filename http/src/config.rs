@@ -1,6 +1,6 @@
 //! go-ipfs compatible configuration file handling and setup.
 
-use ipfs::{multiaddr, Multiaddr, secp256k1, Keypair};
+use ipfs::{multiaddr, secp256k1, Keypair, Multiaddr};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::path::Path;
@@ -55,10 +55,7 @@ pub enum InitializationError {
 
 /// Creates the IPFS_PATH directory structure and creates a new compatible configuration file with
 /// Secp256k1 key. Returns the Peer ID.
-pub fn init(
-    ipfs_path: &Path,
-    profiles: Vec<Profile>,
-) -> Result<String, InitializationError> {
+pub fn init(ipfs_path: &Path, profiles: Vec<Profile>) -> Result<String, InitializationError> {
     use multibase::Base::Base64Pad;
     use prost::Message;
     use std::fs::OpenOptions;

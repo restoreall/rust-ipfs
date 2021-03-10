@@ -16,9 +16,8 @@ where
     S::Error: StdError + Send + Sync + 'static,
 {
     fn into_response(self) -> warp::reply::Response {
-        inner_into_response(self.0,"application/json")
+        inner_into_response(self.0, "application/json")
     }
-
 }
 
 impl<S> Reply for StreamResponseText<S>
@@ -28,12 +27,11 @@ where
     S::Error: StdError + Send + Sync + 'static,
 {
     fn into_response(self) -> warp::reply::Response {
-        inner_into_response(self.0,"text/plain")
+        inner_into_response(self.0, "text/plain")
     }
-
 }
 
-fn inner_into_response<S>(stream:S,content_type:&'static str)->warp::reply::Response
+fn inner_into_response<S>(stream: S, content_type: &'static str) -> warp::reply::Response
 where
     S: TryStream + Send + 'static,
     S::Ok: Into<Bytes>,

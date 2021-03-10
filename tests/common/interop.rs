@@ -7,7 +7,7 @@ pub struct ForeignNode;
 
 #[cfg(any(feature = "test_go_interop", feature = "test_js_interop"))]
 pub mod common {
-    use libp2p_rs::core::{PublicKey, Multiaddr, PeerId};
+    use libp2p_rs::core::{Multiaddr, PeerId, PublicKey};
     use rand::prelude::*;
     use serde::Deserialize;
     use std::{

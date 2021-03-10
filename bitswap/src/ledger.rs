@@ -94,9 +94,9 @@ impl Message {
 
     /// Returns the list of blocks.
     pub fn bytes_of_blocks(&self) -> usize {
-        self.blocks.iter().fold(0, |acc, block| {
-            acc + block.data.len()
-        })
+        self.blocks
+            .iter()
+            .fold(0, |acc, block| acc + block.data.len())
     }
 
     /// Returns the list of blocks, moves ownership.
@@ -141,11 +141,11 @@ impl Message {
     }
 }
 
-impl Into<Vec<u8>> for &Message {
-    fn into(self) -> Vec<u8> {
+impl From<&Message> for Vec<u8> {
+    fn from(msg: &Message) -> Vec<u8> {
         let mut proto = bitswap_pb::Message::default();
         let mut wantlist = bitswap_pb::message::Wantlist::default();
-        for (cid, priority) in self.want() {
+        for (cid, priority) in msg.want() {
             let entry = bitswap_pb::message::wantlist::Entry {
                 block: cid.to_bytes(),
                 priority: *priority,
@@ -153,7 +153,7 @@ impl Into<Vec<u8>> for &Message {
             };
             wantlist.entries.push(entry);
         }
-        for cid in self.cancel() {
+        for cid in msg.cancel() {
             let entry = bitswap_pb::message::wantlist::Entry {
                 block: cid.to_bytes(),
                 cancel: true,
@@ -161,7 +161,7 @@ impl Into<Vec<u8>> for &Message {
             };
             wantlist.entries.push(entry);
         }
-        for block in self.blocks() {
+        for block in msg.blocks() {
             let payload = bitswap_pb::message::Block {
                 prefix: Prefix::from(&block.cid).to_bytes(),
                 data: block.data().to_vec(),

@@ -9,31 +9,31 @@ pub(crate) mod pubsub;
 mod swarm;
 
 pub use addr::{MultiaddrWithPeerId, MultiaddrWithoutPeerId};
-pub use {swarm::Connection};
+pub use swarm::Connection;
 
 use libp2p_rs::core::identity::Keypair;
 use libp2p_rs::core::{Multiaddr, PeerId, ProtocolId, Transport};
 
-use libp2p_rs::swarm::{Control as SwarmControl, Swarm};
 use libp2p_rs::kad::Control as KadControl;
+use libp2p_rs::swarm::{Control as SwarmControl, Swarm};
 //use libp2p_rs::mdns::control::Control as MdnsControl;
-use libp2p_rs::floodsub::control::Control as FloodsubControl;
 use bitswap::Control as BitswapControl;
+use libp2p_rs::floodsub::control::Control as FloodsubControl;
 
 use libp2p_rs::kad::store::MemoryStore;
 
 use bitswap::Bitswap;
 
+use libp2p_rs::core::transport::upgrade::TransportUpgrade;
+use libp2p_rs::core::upgrade::Selector;
+use libp2p_rs::dns::DnsConfig;
+use libp2p_rs::floodsub::floodsub::FloodSub;
+use libp2p_rs::floodsub::FloodsubConfig;
+use libp2p_rs::kad::kad::{Kademlia, KademliaConfig};
 use libp2p_rs::swarm::identify::IdentifyConfig;
 use libp2p_rs::swarm::ping::PingConfig;
-use libp2p_rs::kad::kad::{KademliaConfig, Kademlia};
-use libp2p_rs::floodsub::FloodsubConfig;
-use libp2p_rs::floodsub::floodsub::FloodSub;
-use libp2p_rs::{noise, yamux, mplex, secio};
-use libp2p_rs::core::upgrade::Selector;
-use libp2p_rs::core::transport::upgrade::TransportUpgrade;
 use libp2p_rs::tcp::TcpConfig;
-use libp2p_rs::dns::DnsConfig;
+use libp2p_rs::{mplex, noise, secio, yamux};
 
 /// Libp2p Network controllers.
 pub struct Controls {
@@ -54,7 +54,6 @@ impl Clone for Controls {
         }
     }
 }
-
 
 /// Defines the configuration for an IPFS swarm.
 pub struct SwarmOptions {
@@ -101,7 +100,14 @@ impl Controls {
 
         let mux = Selector::new(yamux::Config::new(), mplex::Config::new());
         let tu = TransportUpgrade::new(
-            DnsConfig::new(TcpConfig::new().nodelay(true).outbound_timeout(Duration::from_secs(20))), mux, sec);
+            DnsConfig::new(
+                TcpConfig::new()
+                    .nodelay(true)
+                    .outbound_timeout(Duration::from_secs(20)),
+            ),
+            mux,
+            sec,
+        );
 
         // Make swarm
         let mut swarm = Swarm::new(options.keypair.public())
@@ -131,7 +137,9 @@ impl Controls {
         let mut kad_control = kad.control();
 
         // update Swarm to support Kad and Routing
-        swarm = swarm.with_protocol(kad).with_routing(Box::new(kad_control.clone()));
+        swarm = swarm
+            .with_protocol(kad)
+            .with_routing(Box::new(kad_control.clone()));
 
         let mut floodsub_config = FloodsubConfig::new(*swarm.local_peer_id());
         floodsub_config.subscribe_local_messages = true;
@@ -202,7 +210,9 @@ impl Controls {
     pub fn kad_mut(&mut self) -> &mut KadControl {
         &mut self.kad
     }
-    pub fn pubsub_mut(&mut self) -> &mut FloodsubControl { &mut self.pubsub }
+    pub fn pubsub_mut(&mut self) -> &mut FloodsubControl {
+        &mut self.pubsub
+    }
     pub fn bitswap_mut(&mut self) -> &mut BitswapControl {
         &mut self.bitswap
     }
@@ -210,8 +220,12 @@ impl Controls {
     pub fn swarm(&self) -> SwarmControl {
         self.swarm.clone()
     }
-    pub fn kad(&self) -> KadControl { self.kad.clone() }
-    pub fn pubsub(&self) -> FloodsubControl { self.pubsub.clone() }
+    pub fn kad(&self) -> KadControl {
+        self.kad.clone()
+    }
+    pub fn pubsub(&self) -> FloodsubControl {
+        self.pubsub.clone()
+    }
     pub fn bitswap(&self) -> BitswapControl {
         self.bitswap.clone()
     }

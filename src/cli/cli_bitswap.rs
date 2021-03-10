@@ -1,8 +1,8 @@
-use libp2p_rs::runtime::task;
-use libp2p_rs::core::PeerId;
-use std::str::FromStr;
-use libp2p_rs::xcli::*;
 use bitswap::Control;
+use libp2p_rs::core::PeerId;
+use libp2p_rs::runtime::task;
+use libp2p_rs::xcli::*;
+use std::str::FromStr;
 
 const BITSWAP: &str = "bitswap";
 
@@ -25,13 +25,9 @@ pub(crate) fn bitswap_cli_commands<'a>() -> Command<'a> {
 
 pub(crate) fn handler(app: &App) -> Control {
     let value_any = app.get_handler(BITSWAP).expect(BITSWAP);
-    let ipfs = value_any
-        .downcast_ref::<Control>()
-        .expect("ipfs")
-        .clone();
+    let ipfs = value_any.downcast_ref::<Control>().expect("ipfs").clone();
     ipfs
 }
-
 
 fn cli_wl_bitswap(app: &App, args: &[&str]) -> XcliResult {
     let mut peer = None;

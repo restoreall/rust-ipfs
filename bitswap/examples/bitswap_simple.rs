@@ -5,6 +5,8 @@ use cid::Cid;
 use libp2p_rs::core::identity::Keypair;
 use libp2p_rs::core::transport::upgrade::TransportUpgrade;
 use libp2p_rs::core::{Multiaddr, PeerId};
+use libp2p_rs::kad::kad::Kademlia;
+use libp2p_rs::kad::store::MemoryStore;
 use libp2p_rs::mplex;
 use libp2p_rs::noise::{Keypair as NKeypair, NoiseConfig, X25519Spec};
 use libp2p_rs::runtime::task;
@@ -15,8 +17,6 @@ use libp2p_rs::tcp::TcpConfig;
 use std::convert::TryFrom;
 use std::error::Error;
 use std::str::FromStr;
-use libp2p_rs::kad::store::MemoryStore;
-use libp2p_rs::kad::kad::Kademlia;
 
 fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -63,7 +63,7 @@ fn run(peer: PeerId, addr: Multiaddr) {
 
             let cid = Cid::from_str(msg).expect("invalid cid");
             let res = bitswap.want_block(cid.clone(), 1).await;
-            if let Ok(block) =  res {
+            if let Ok(block) = res {
                 log::info!("{}: {:?}", cid, block)
             }
         }
@@ -113,7 +113,8 @@ fn setup_swarm(keys: Keypair, listen_addr: Multiaddr) -> (Swarm_Control, Bitswap
 
     // register kad and bitswap
     swarm = swarm
-        .with_protocol(kad).with_routing(Box::new(kad_ctrl))
+        .with_protocol(kad)
+        .with_routing(Box::new(kad_ctrl))
         .with_protocol(bitswap);
     let swarm_control = swarm.control();
 

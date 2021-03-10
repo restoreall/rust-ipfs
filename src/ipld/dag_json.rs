@@ -36,7 +36,7 @@ pub fn json_encode(ipld: &Ipld) -> Result<Box<[u8]>, Error> {
 
 pub fn json_decode(data: &[u8]) -> Result<Ipld, Error> {
     let mut de = serde_json::Deserializer::from_slice(&data);
-    Ok(deserialize(&mut de)?)
+    deserialize(&mut de)
 }
 
 fn serialize<S>(ipld: &Ipld, ser: S) -> Result<S::Ok, S::Error>

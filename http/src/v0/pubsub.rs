@@ -110,7 +110,9 @@ pub fn subscribe<T: IpfsTypes>(
         .and(warp::any().map(move || pubsub.clone()))
         .and(warp::query::<TopicParameter>())
         .and_then(|ipfs, pubsub, TopicParameter { topic }| async move {
-            Ok::<_, warp::Rejection>(StreamResponseJson(inner_subscribe(ipfs, pubsub, topic).await))
+            Ok::<_, warp::Rejection>(StreamResponseJson(
+                inner_subscribe(ipfs, pubsub, topic).await,
+            ))
         })
 }
 
@@ -339,9 +341,9 @@ impl From<Bytes> for PreformattedJsonMessage {
 }
 
 // This direction is required by warp::hyper::Body
-impl Into<Bytes> for PreformattedJsonMessage {
-    fn into(self) -> Bytes {
-        self.0
+impl From<PreformattedJsonMessage> for Bytes {
+    fn from(msg: PreformattedJsonMessage) -> Bytes {
+        msg.0
     }
 }
 

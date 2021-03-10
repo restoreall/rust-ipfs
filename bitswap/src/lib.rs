@@ -7,7 +7,7 @@ mod prefix;
 mod protocol;
 mod stat;
 
-pub use bitswap::Bitswap;
+pub use crate::bitswap::Bitswap;
 pub use block::Block;
 pub use block::BsBlockStore;
 pub use control::Control;
@@ -31,10 +31,3 @@ mod bitswap_pb {
 //
 // pub type IBlockStore = Box<dyn BlockStore + Send + Sync>;
 //
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}

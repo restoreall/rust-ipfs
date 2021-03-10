@@ -1,10 +1,10 @@
-use std::sync::Arc;
-use std::collections::HashMap;
-use std::time::Duration;
 use cid::Cid;
 use futures::channel::{mpsc, oneshot};
-use futures::{select, SinkExt};
 use futures::StreamExt;
+use futures::{select, SinkExt};
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
 
 use libp2p_rs::core::PeerId;
 use libp2p_rs::runtime::task;
@@ -14,11 +14,11 @@ use crate::block::Block;
 use crate::control::Control;
 use crate::error::BitswapError;
 use crate::ledger::{Ledger, Message, Priority};
-use crate::protocol::{Handler, ProtocolEvent, send_message};
+use crate::protocol::{send_message, Handler, ProtocolEvent};
 use crate::stat::Stats;
 use crate::BsBlockStore;
-use libp2p_rs::swarm::protocol_handler::{ProtocolImpl, IProtocolHandler};
 use libp2p_rs::core::routing::Routing;
+use libp2p_rs::swarm::protocol_handler::{IProtocolHandler, ProtocolImpl};
 
 const WANT_DEADLINE: Duration = Duration::from_secs(30);
 
@@ -26,7 +26,10 @@ pub(crate) enum ControlCommand {
     WantBlock(Cid, oneshot::Sender<Result<Block>>),
     HasBlock(Cid, oneshot::Sender<Result<()>>),
     CancelBlock(Cid, oneshot::Sender<Result<()>>),
-    WantList(Option<PeerId>, oneshot::Sender<Result<Vec<(Cid, Priority)>>>),
+    WantList(
+        Option<PeerId>,
+        oneshot::Sender<Result<Vec<(Cid, Priority)>>>,
+    ),
     Peers(oneshot::Sender<Result<Vec<PeerId>>>),
     Stats(oneshot::Sender<Result<Stats>>),
 }
@@ -70,9 +73,9 @@ pub struct Bitswap<TBlockStore, TRouting> {
 type Result<T> = std::result::Result<T, BitswapError>;
 
 impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
-    where
-        TBlockStore: BsBlockStore,
-        TRouting: Routing + Clone + 'static
+where
+    TBlockStore: BsBlockStore,
+    TRouting: Routing + Clone + 'static,
 {
     pub fn new(blockstore: TBlockStore, routing: TRouting) -> Self {
         let (peer_tx, peer_rx) = mpsc::unbounded();
@@ -121,7 +124,10 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
 
     fn send_message_to(&mut self, peer_id: PeerId, message: Message) {
         if let Some(peer_stats) = self.stats.get_mut(&peer_id) {
-            peer_stats.update_outgoing(message.num_of_blocks() as u64, message.bytes_of_blocks() as u64);
+            peer_stats.update_outgoing(
+                message.num_of_blocks() as u64,
+                message.bytes_of_blocks() as u64,
+            );
         }
 
         // spwan a task to send the message
@@ -135,7 +141,10 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
         for (peer_id, ledger) in &mut self.connected_peers {
             if let Some(message) = ledger.send() {
                 if let Some(peer_stats) = self.stats.get_mut(peer_id) {
-                    peer_stats.update_outgoing(message.num_of_blocks() as u64, message.bytes_of_blocks() as u64);
+                    peer_stats.update_outgoing(
+                        message.num_of_blocks() as u64,
+                        message.bytes_of_blocks() as u64,
+                    );
                 }
 
                 // spwan a task to send the message
@@ -151,10 +160,12 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
     fn handle_event(&mut self, evt: Option<ProtocolEvent>) {
         match evt {
             Some(ProtocolEvent::Blocks(peer, blocks)) => {
-                log::debug!("blockstore reports {} block(s) for {:?}", blocks.len(), peer);
-                let ledger = if let Some(l) = self
-                    .connected_peers
-                    .get_mut(&peer){
+                log::debug!(
+                    "blockstore reports {} block(s) for {:?}",
+                    blocks.len(),
+                    peer
+                );
+                let ledger = if let Some(l) = self.connected_peers.get_mut(&peer) {
                     l
                 } else {
                     log::info!("got incoming message from {:?} without ledge", peer);
@@ -184,19 +195,18 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
         }
     }
 
-    async fn handle_incoming_message(
-        &mut self,
-        source: PeerId,
-        mut message: Message,
-    ) {
-        log::debug!("incoming message: from {:?}, w={} c={} b={}", source,
-                    message.want().len(), message.cancel().len(), message.blocks().len());
+    async fn handle_incoming_message(&mut self, source: PeerId, mut message: Message) {
+        log::debug!(
+            "incoming message: from {:?}, w={} c={} b={}",
+            source,
+            message.want().len(),
+            message.cancel().len(),
+            message.blocks().len()
+        );
 
         let current_wantlist = self.local_wantlist();
 
-        let ledger = if let Some(l) = self
-            .connected_peers
-            .get_mut(&source) {
+        let ledger = if let Some(l) = self.connected_peers.get_mut(&source) {
             l
         } else {
             log::info!("got incoming message from {:?} without ledge", source);
@@ -221,7 +231,11 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
 
         if !to_check.is_empty() {
             // ask blockstore for the wanted blocks
-            log::debug!("{:?} asking for {} block(s), checking blockstore", source, to_check.len());
+            log::debug!(
+                "{:?} asking for {} block(s), checking blockstore",
+                source,
+                to_check.len()
+            );
             let blockstore = self.blockstore.clone();
             let mut poster = self.peer_tx.clone();
             task::spawn(async move {
@@ -276,10 +290,10 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
                 match res {
                     Ok((_, true)) => {
                         peer_stats.update_incoming_unique(bytes);
-                    },
+                    }
                     Ok((_, false)) => {
                         peer_stats.update_incoming_duplicate(bytes);
-                    },
+                    }
                     Err(e) => {
                         log::info!("Got block from {:?} but failed to store it: {}", source, e);
                     }
@@ -296,28 +310,26 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
             Some(ControlCommand::HasBlock(cid, reply)) => {
                 self.has_block(cid, reply);
             }
-            Some(ControlCommand::CancelBlock(cid, reply)) => {
-                self.cancel_block(&cid, reply)
-            },
+            Some(ControlCommand::CancelBlock(cid, reply)) => self.cancel_block(&cid, reply),
             Some(ControlCommand::WantList(peer, reply)) => {
                 if let Some(peer_id) = peer {
-                    let list = self.peer_wantlist(&peer_id)
-                        .unwrap_or_default();
+                    let list = self.peer_wantlist(&peer_id).unwrap_or_default();
                     let _ = reply.send(Ok(list));
                 } else {
-                    let list = self.local_wantlist()
+                    let list = self
+                        .local_wantlist()
                         .into_iter()
                         .map(|cid| (cid, 1))
                         .collect();
                     let _ = reply.send(Ok(list));
                 }
-            },
+            }
             Some(ControlCommand::Peers(reply)) => {
                 let _ = reply.send(Ok(self.peers()));
-            },
+            }
             Some(ControlCommand::Stats(reply)) => {
                 let _ = reply.send(Ok(self.stats()));
-            },
+            }
             None => {
                 // control channel closed, exit the main loop
                 return Err(BitswapError::Closing);
@@ -329,7 +341,12 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
     /// Retrieves the wanted block.
     ///
     /// A user request
-    pub fn want_block(&mut self, cid: Cid, priority: Priority, reply: oneshot::Sender<Result<Block>>) {
+    pub fn want_block(
+        &mut self,
+        cid: Cid,
+        priority: Priority,
+        reply: oneshot::Sender<Result<Block>>,
+    ) {
         log::debug!("bitswap want block {} ", cid);
 
         // TODO: should run a dedicated peer manager for find_providers...
@@ -353,7 +370,10 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
             ledger.want_block(&cid, priority);
         }
         let (tx, rx) = oneshot::channel();
-        self.wanted_blocks.entry(cid).or_insert(vec![]).push(tx);
+        self.wanted_blocks
+            .entry(cid)
+            .or_insert_with(Vec::new)
+            .push(tx);
 
         // ask all known peers for the wanted block
         self.broadcast_messages();
@@ -454,9 +474,9 @@ impl<TBlockStore, TRouting> Bitswap<TBlockStore, TRouting>
 }
 
 impl<TBlockStore, TRouting> ProtocolImpl for Bitswap<TBlockStore, TRouting>
-    where
-        TBlockStore: BsBlockStore,
-        TRouting: Routing + Clone + 'static
+where
+    TBlockStore: BsBlockStore,
+    TRouting: Routing + Clone + 'static,
 {
     /// Get handler of floodsub, swarm will call "handle" func after muxer negotiate success.
     fn handler(&self) -> IProtocolHandler {
@@ -464,8 +484,10 @@ impl<TBlockStore, TRouting> ProtocolImpl for Bitswap<TBlockStore, TRouting>
     }
 
     /// Start message process loop.
-    fn start(mut self, swarm: SwarmControl) -> Option<task::TaskHandle<()>> where
-        Self: Sized, {
+    fn start(mut self, swarm: SwarmControl) -> Option<task::TaskHandle<()>>
+    where
+        Self: Sized,
+    {
         self.swarm = Some(swarm);
 
         // well, self 'move' explicitly,

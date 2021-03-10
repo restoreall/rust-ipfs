@@ -1,18 +1,18 @@
 //! Storage implementation(s) backing the [`crate::Ipfs`].
+use async_trait::async_trait;
+use cid::Cid;
+use core::fmt::Debug;
 use std::borrow::Borrow;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::{error, fmt, io};
-use core::fmt::Debug;
-use async_trait::async_trait;
-use cid::Cid;
 
 use libp2p_rs::core::PeerId;
 
 use crate::error::Error;
 use crate::path::IpfsPath;
-use crate::{Block, IpfsOptions, BsBlockStore};
+use crate::{Block, BsBlockStore, IpfsOptions};
 
 #[macro_use]
 #[cfg(test)]
@@ -276,11 +276,13 @@ impl PinModeRequirement {
 
 impl<B: Borrow<Cid>> PartialEq<PinMode> for PinKind<B> {
     fn eq(&self, other: &PinMode) -> bool {
-        matches!((self, other),
+        matches!(
+            (self, other),
             (PinKind::IndirectFrom(_), PinMode::Indirect)
-            | (PinKind::Direct, PinMode::Direct)
-            | (PinKind::Recursive(_), PinMode::Recursive)
-            | (PinKind::RecursiveIntention, PinMode::Recursive))
+                | (PinKind::Direct, PinMode::Direct)
+                | (PinKind::Recursive(_), PinMode::Recursive)
+                | (PinKind::RecursiveIntention, PinMode::Recursive)
+        )
     }
 }
 
@@ -347,8 +349,7 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
     }
 
     /// Shutdowns the repo, closes the repo event sender.
-    pub fn shutdown(&self) {
-    }
+    pub fn shutdown(&self) {}
 
     pub async fn init(&self) -> Result<(), Error> {
         // Dropping the guard (even though not strictly necessary to compile) to avoid potential
@@ -413,9 +414,7 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
         // could potentially be pushed out out of here up to Ipfs, idk
         match self.0.block_store.remove(&cid).await? {
             Ok(success) => match success {
-                BlockRm::Removed(_cid) => {
-                    Ok(cid.clone())
-                }
+                BlockRm::Removed(_cid) => Ok(cid.clone()),
             },
             Err(err) => match err {
                 BlockRmError::NotFound(_cid) => Err(anyhow::anyhow!("block not found")),
@@ -446,7 +445,8 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
         let string = path.to_string();
         let value = string.as_bytes();
         // FIXME: needless vec<u8> creation
-        self.0.data_store
+        self.0
+            .data_store
             .put(Column::Ipns, &ipns.to_bytes()[..], value)
             .await
     }
@@ -455,7 +455,8 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
     pub async fn remove_ipns(&self, ipns: &PeerId) -> Result<(), Error> {
         // FIXME: us needing to clone the peerid is wasteful to pass it as a reference only to be
         // cloned again
-        self.0.data_store
+        self.0
+            .data_store
             .remove(Column::Ipns, &ipns.to_bytes()[..])
             .await
     }
@@ -502,7 +503,6 @@ impl<TRepoTypes: RepoTypes> Repo<TRepoTypes> {
     }
 }
 
-
 // for bitswap
 #[async_trait]
 impl<TRepoTypes: RepoTypes> BsBlockStore for Repo<TRepoTypes> {
@@ -515,14 +515,20 @@ impl<TRepoTypes: RepoTypes> BsBlockStore for Repo<TRepoTypes> {
     }
 
     async fn put(&self, block: Block) -> Result<(Cid, bool), Box<dyn error::Error>> {
-        self.0.block_store.put(block).await
+        self.0
+            .block_store
+            .put(block)
+            .await
             .map(|(cid, put)| (cid, put == BlockPut::NewBlock))
             .map_err(Error::into)
     }
 
     async fn remove(&self, cid: &Cid) -> Result<(), Box<dyn error::Error>> {
-        self.0.block_store.remove(cid).await
-            .and_then(|r| r.map(|_| ()).map_err(|_|Error::msg("BlockRmError")))
+        self.0
+            .block_store
+            .remove(cid)
+            .await
+            .and_then(|r| r.map(|_| ()).map_err(|_| Error::msg("BlockRmError")))
             .map_err(Error::into)
     }
 }

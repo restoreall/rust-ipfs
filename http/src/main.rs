@@ -60,7 +60,7 @@ fn main() {
     let config_path = home.join("config");
 
     let config = match opts {
-        Options::Init {  profile } => {
+        Options::Init { profile } => {
             println!("initializing IPFS node at {:?}", home);
 
             if config_path.is_file() {

@@ -1,6 +1,6 @@
 use cid::Cid;
-use std::fmt::Debug;
 use std::error::Error;
+use std::fmt::Debug;
 
 use async_trait::async_trait;
 

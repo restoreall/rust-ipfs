@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::p2p::{MultiaddrWithPeerId};
+use crate::p2p::MultiaddrWithPeerId;
 
 /// A description of currently active connection.
 #[derive(Clone, Debug, PartialEq, Eq)]

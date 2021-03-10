@@ -4,14 +4,14 @@ use crate::Cid;
 use crate::{Block, IpfsPath};
 use futures::{pin_mut, stream::StreamExt};
 use ipfs_unixfs::file::adder::FileAdder;
+use libp2p_rs::runtime::task;
+use libp2p_rs::xcli::XcliError::BadArgument;
+use libp2p_rs::xcli::*;
 use std::convert::TryFrom;
 use std::fs::{DirBuilder, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::exit;
-use libp2p_rs::xcli::*;
-use libp2p_rs::xcli::XcliError::BadArgument;
-use libp2p_rs::runtime::task;
 
 pub(crate) fn cli_add_commands<'a>() -> Command<'a> {
     Command::new_with_alias("add", "a")
@@ -159,9 +159,7 @@ fn cli_get(app: &App, args: &[&str]) -> XcliResult {
 
     let ipfs = handler(app);
 
-    let cid = Cid::try_from(args[0]).map_err(|e| {
-        BadArgument(e.to_string())
-    })?;
+    let cid = Cid::try_from(args[0]).map_err(|e| BadArgument(e.to_string()))?;
 
     let mut walker = Walker::new(cid, "".to_string());
 
@@ -187,8 +185,7 @@ fn cli_get(app: &App, args: &[&str]) -> XcliResult {
                 .unwrap_or_else(|e| {
                     println!("Error in walker.next(): {:?}", e);
                     exit(1);
-                })
-            {
+                }) {
                 ContinuedWalk::Bucket(..) => {
                     // Continuation of a HAMT shard directory that is usually ignored
                 }
@@ -210,16 +207,22 @@ fn cli_get(app: &App, args: &[&str]) -> XcliResult {
                     // If true, means that it is the first block.
                     if segment.is_first() {
                         same_file = true;
-                        let _ = OpenOptions::new().write(true).append(true)
-                            .create(true).open(file_name.clone()).unwrap_or_else(|e| {
-                            println!("Error in create file: {:?}", e);
-                            exit(1);
-                        });
+                        let _ = OpenOptions::new()
+                            .write(true)
+                            .append(true)
+                            .create(true)
+                            .open(file_name.clone())
+                            .unwrap_or_else(|e| {
+                                println!("Error in create file: {:?}", e);
+                                exit(1);
+                            });
                     }
 
                     // If true, it means file is larger than 256k and has been split
                     if same_file {
-                        let mut file = OpenOptions::new().append(true).open(file_name.clone())
+                        let mut file = OpenOptions::new()
+                            .append(true)
+                            .open(file_name.clone())
                             .map_err(|e| {
                                 println!("Error in open file: {:?}", e);
                                 exit(1);
@@ -242,21 +245,19 @@ fn cli_get(app: &App, args: &[&str]) -> XcliResult {
                     // Root directory
                     if let Some("") = path.to_str() {
                         root.push(multibase::Base::Base32Upper.encode(tmp_cid.to_bytes()));
-                        DirBuilder::new().create(&root)
-                            .unwrap_or_else(|e| {
-                                println!("Error in create dir by path empty: {:?}", e);
-                                exit(1);
-                            });
+                        DirBuilder::new().create(&root).unwrap_or_else(|e| {
+                            println!("Error in create dir by path empty: {:?}", e);
+                            exit(1);
+                        });
                         println!("Directory: {:?}", &root)
                     } else {
                         // Other directory
                         let mut root_tmp = root.clone();
                         root_tmp.push(path);
-                        DirBuilder::new().create(&root_tmp)
-                            .unwrap_or_else(|e| {
-                                println!("Error in create dir: {:?}", e);
-                                exit(1);
-                            });
+                        DirBuilder::new().create(&root_tmp).unwrap_or_else(|e| {
+                            println!("Error in create dir: {:?}", e);
+                            exit(1);
+                        });
                         println!("Directory: {:?}", root_tmp)
                     }
                 }

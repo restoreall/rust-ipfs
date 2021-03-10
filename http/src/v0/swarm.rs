@@ -1,7 +1,7 @@
 use super::support::{with_ipfs, StringError};
 use ipfs::{Ipfs, IpfsTypes, MultiaddrWithPeerId};
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use warp::{query, Filter};
 
@@ -24,12 +24,12 @@ async fn connect_query<T: IpfsTypes>(
         .arg
         .parse::<MultiaddrWithPeerId>()
         .map_err(|e| warp::reject::custom(StringError::from(e)))?;
-    let peer_id=target.peer_id;
+    let peer_id = target.peer_id;
     ipfs.connect(target)
         .await
         .map_err(|e| warp::reject::custom(StringError::from(e)))?;
-    let strings=vec![String::from(format!("connect {0} success",peer_id))];
-    Ok(warp::reply::json(&ConnInfoResponse{strings}))
+    let strings = vec![format!("connect {0} success", peer_id)];
+    Ok(warp::reply::json(&ConnInfoResponse { strings }))
 }
 
 pub fn connect<T: IpfsTypes>(
@@ -58,8 +58,6 @@ struct Peer {
     peer: String,
     latency: Option<Cow<'static, str>>,
 }
-
-
 
 async fn peers_query<T: IpfsTypes>(
     ipfs: Ipfs<T>,
@@ -182,12 +180,12 @@ async fn disconnect_query<T: IpfsTypes>(
         .arg
         .parse::<MultiaddrWithPeerId>()
         .map_err(|e| warp::reject::custom(StringError::from(e)))?;
-    let peer_id=target.peer_id;
+    let peer_id = target.peer_id;
     ipfs.disconnect(target)
         .await
         .map_err(|e| warp::reject::custom(StringError::from(e)))?;
-    let strings=vec![String::from(format!("disconnect {0} success",peer_id))];
-    Ok(warp::reply::json(&ConnInfoResponse{strings}))
+    let strings = vec![format!("disconnect {0} success", peer_id)];
+    Ok(warp::reply::json(&ConnInfoResponse { strings }))
 }
 
 pub fn disconnect<T: IpfsTypes>(

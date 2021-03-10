@@ -1,8 +1,7 @@
 on:
   push:
     branches:
-      - trying
-      - staging
+      - master
   pull_request:
     branches: '*'
 
@@ -29,9 +28,9 @@ jobs:
           host: windows-latest
           cross: false
 
-        - target: armv7-linux-androideabi
-          host: ubuntu-latest
-          cross: true
+        # - target: armv7-linux-androideabi
+        #   host: ubuntu-latest
+        #   cross: true
 
         - target: aarch64-linux-android
           host: ubuntu-latest
@@ -120,9 +119,9 @@ jobs:
       if: matrix.platform.cross == false
       run: cargo build --locked --workspace --all-targets
 
-    - name: Run interop DHT tests with go-ipfs
-      if: matrix.platform.host == 'ubuntu-latest' && matrix.platform.cross == false
-      run: cargo test --features=test_go_interop dht
+    # - name: Run interop DHT tests with go-ipfs
+    #   if: matrix.platform.host == 'ubuntu-latest' && matrix.platform.cross == false
+    #   run: cargo test --features=test_go_interop dht
 
     - name: Setup conformance tests (non-cross targets)
       if: matrix.platform.cross == false
@@ -191,7 +190,7 @@ jobs:
       run: cargo fmt --all -- --check
 
     - name: cargo clippy
-      run: cargo clippy --all-targets --workspace -- -D warnings
+      run: cargo clippy  --all-targets --workspace -- -D warnings -A clippy::unnecessary-wraps
 
   # adapted from https://github.com/taiki-e/pin-project/blob/5878410863f5f25e21f7cba97b035501749850f9/.github/workflows/ci.yml#L136-L167
   # further enchanced following solutions to

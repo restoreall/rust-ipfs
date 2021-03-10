@@ -10,8 +10,6 @@ use libp2p_rs::xcli::*;
 
 const IPFS: &str = "ipfs";
 
-
-
 pub(crate) fn ipfs_cli_commands<'a>() -> Command<'a> {
     Command::new_with_alias(IPFS, "i")
         .about("IPFS")

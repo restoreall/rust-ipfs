@@ -21,9 +21,10 @@ const options = {
   test: true,
   disposable: true,
   ipfsHttpModule: require('ipfs-http-client'),
+  emptyRepo:true,
   ipfsOptions: {
     init: {
-      bits: 2048
+      profiles:["test"]
     }
   }
 }
@@ -71,7 +72,12 @@ tests.block(factory, {
   ]
 })
 
-tests.bitswap(factory);
+tests.bitswap(factory,{
+  skip:[
+    'should remove blocks from the wantlist when requests are cancelled',
+    'should keep blocks in the wantlist when only one request is cancelled'
+  ]
+});
 tests.root.refs(factory);
 tests.root.refsLocal(factory);
 
@@ -124,8 +130,7 @@ tests.dht(factory, {
   ]
 });
 
-// tests.repo(factory)
-// tests.object(factory)
+
 tests.pin.add(factory, {
   skip: [
     'should respect timeout option when pinning a block'
@@ -145,9 +150,9 @@ tests.pin.rm(factory, {
     'should respect timeout option when unpinning a block'
   ]
 })
-
-tests.bootstrap(factory);
-
+// tests.repo(factory)
+// tests.object(factory)
+// tests.bootstrap(factory);
 // tests.name(factory)
 // tests.namePubsub(factory)
 // tests.ping(factory)

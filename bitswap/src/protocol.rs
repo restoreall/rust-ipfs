@@ -1,18 +1,18 @@
-use std::error::Error;
 use async_trait::async_trait;
 use futures::channel::mpsc;
 use futures::SinkExt;
+use std::error::Error;
 
 use libp2p_rs::core::upgrade::UpgradeInfo;
 use libp2p_rs::core::{PeerId, ProtocolId};
 use libp2p_rs::swarm::connection::Connection;
-use libp2p_rs::swarm::Control as SwarmControl;
 use libp2p_rs::swarm::protocol_handler::{IProtocolHandler, Notifiee, ProtocolHandler};
 use libp2p_rs::swarm::substream::Substream;
+use libp2p_rs::swarm::Control as SwarmControl;
 use libp2p_rs::traits::{ReadEx, WriteEx};
 
 use crate::ledger::Message;
-use crate::{BS_PROTO_ID, Block};
+use crate::{Block, BS_PROTO_ID};
 
 const MAX_BUF_SIZE: usize = 524_288;
 
@@ -83,7 +83,11 @@ impl ProtocolHandler for Handler {
 }
 
 // Sends bitswap message to remote peer.
-pub(crate) async fn send_message(mut swarm: SwarmControl, peer_id: PeerId, message: Message) -> Result<(), Box<dyn Error>> {
+pub(crate) async fn send_message(
+    mut swarm: SwarmControl,
+    peer_id: PeerId,
+    message: Message,
+) -> Result<(), Box<dyn Error>> {
     log::debug!("sending message to {:?}...", peer_id);
     let mut stream = swarm.new_stream(peer_id, vec![BS_PROTO_ID.into()]).await?;
     stream.write_one(message.to_bytes().as_ref()).await?;

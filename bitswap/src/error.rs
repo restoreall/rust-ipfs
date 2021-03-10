@@ -1,5 +1,5 @@
-use thiserror::Error;
 use futures::channel::{mpsc, oneshot};
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum BitswapError {

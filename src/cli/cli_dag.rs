@@ -1,8 +1,8 @@
 use crate::cli::handler;
 use cid::Cid;
 use libp2p_rs::runtime::task;
-use std::convert::TryFrom;
 use libp2p_rs::xcli::*;
+use std::convert::TryFrom;
 
 pub(crate) fn cli_dag_commands<'a>() -> Command<'a> {
     let get_dag_cmd = Command::new_with_alias("get", "g")

@@ -109,7 +109,7 @@ async fn get_inner<T: IpfsTypes>(ipfs: Ipfs<T>, args: GetArgs) -> Result<impl Re
         .await
         .map_err(StringError::from)?
         .map_err(StringError::from)?;
-        Ok(StreamResponseText(walk(ipfs, block).into_stream()))
+    Ok(StreamResponseText(walk(ipfs, block).into_stream()))
 }
 
 async fn resolve_dagpb<T: IpfsTypes>(ipfs: &Ipfs<T>, path: IpfsPath) -> Result<Block, StringError> {

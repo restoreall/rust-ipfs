@@ -1,12 +1,11 @@
-
+use libp2p_rs::core::{Multiaddr, PeerId};
+use libp2p_rs::multiaddr;
+use libp2p_rs::multiaddr::protocol::Protocol;
 use std::{
     convert::{TryFrom, TryInto},
     fmt,
     str::FromStr,
 };
-use libp2p_rs::multiaddr;
-use libp2p_rs::core::{Multiaddr, PeerId};
-use libp2p_rs::multiaddr::protocol::Protocol;
 
 /// An error that can be thrown when converting to `MultiaddrWithPeerId` and
 /// `MultiaddrWithoutPeerId`.
@@ -134,7 +133,10 @@ impl TryFrom<Multiaddr> for MultiaddrWithPeerId {
             // is unexpected; it is hard to trigger, hence this debug-only assertion so we might be
             // able to catch it sometime during tests
             debug_assert!(
-                matches!(multiaddr.iter().last(), Some(Protocol::P2p(_)) | Some(Protocol::P2pCircuit)),
+                matches!(
+                    multiaddr.iter().last(),
+                    Some(Protocol::P2p(_)) | Some(Protocol::P2pCircuit)
+                ),
                 "unexpected Multiaddr format: {}",
                 multiaddr
             );

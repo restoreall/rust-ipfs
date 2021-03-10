@@ -1,9 +1,9 @@
 use crate::{cli::handler, Block};
 use cid::Cid;
 use libp2p_rs::runtime::task;
+use libp2p_rs::xcli::*;
 use multihash::Sha2_256;
 use std::convert::TryFrom;
-use libp2p_rs::xcli::*;
 
 pub(crate) fn cli_block_commands<'a>() -> Command<'a> {
     let get_block_cmd = Command::new_with_alias("get", "g")
