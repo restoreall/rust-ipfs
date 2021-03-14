@@ -171,10 +171,16 @@ fn cli_get(app: &App, args: &[&str]) -> XcliResult {
 
             let tmp_cid = cid.clone();
 
-            let ipld_block = ipfs.get_block(cid).await.unwrap_or_else(|e| {
-                println!("Failed to get block {}: {:?}", cid, e);
-                exit(1);
-            });
+            if true /*verbose*/ {
+                println!("fetching cid {}", tmp_cid);
+            }
+
+            let r = ipfs.get_block(cid).await;
+            if r.is_err() {
+                println!("Failed to get block {}: {:?}", cid, r);
+                return;
+            }
+            let ipld_block = r.unwrap();
 
             match walker
                 .next(&ipld_block.into_vec(), &mut cache)

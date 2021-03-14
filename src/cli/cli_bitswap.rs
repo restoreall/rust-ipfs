@@ -11,7 +11,7 @@ pub(crate) fn bitswap_cli_commands<'a>() -> Command<'a> {
         .about("Show blocks currently on the wantlist")
         .usage("ipfs bitswap wantlist")
         .action(cli_wl_bitswap);
-    let stat_cmd = Command::new_with_alias("stat", "s")
+    let stat_cmd = Command::new_with_alias("stat", "st")
         .about("Show some diagnostic information on the bitswap agent")
         .usage("ipfs bitswap stat")
         .action(cli_stat_bitswap);
