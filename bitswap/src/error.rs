@@ -7,6 +7,8 @@ pub enum BitswapError {
     ProtobufError(#[from] prost::DecodeError),
     #[error("Error while parsing cid: {0}")]
     Cid(#[from] cid::Error),
+    #[error("Invalid Message")]
+    InvalidData,
     #[error("Closing")]
     Closing,
     #[error("Timeout")]

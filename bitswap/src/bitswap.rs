@@ -19,7 +19,6 @@ use crate::stat::Stats;
 use crate::BsBlockStore;
 use libp2p_rs::core::routing::Routing;
 use libp2p_rs::swarm::protocol_handler::{IProtocolHandler, ProtocolImpl};
-
 const WANT_DEADLINE: Duration = Duration::from_secs(30);
 
 pub(crate) enum ControlCommand {
@@ -182,8 +181,7 @@ where
             Some(ProtocolEvent::NewPeer(p)) => {
                 log::debug!("{:?} connected", p);
                 // make a ledge for the peer and send wantlist to it
-                let ledger = Ledger::new();
-                self.connected_peers.insert(p, ledger);
+                self.connected_peers.entry(p).or_default();
                 self.stats.entry(p).or_default();
                 self.send_want_list(p);
             }
@@ -217,6 +215,16 @@ where
         for cid in message.cancel() {
             ledger.received_want_list.remove(cid);
         }
+
+        // block presences had added into bitswap proto when 2020.1
+        // But it still doesn't work now in go-ipfs v0.7
+        // for have in message.have() {
+        //     log::info!("peer {} have block {}", source, have);
+        // }
+        //
+        // for dont in message.dont_have() {
+        //     log::info!("peer {} don't have block {}", source, dont);
+        // }
 
         // Process the incoming wantlist.
         let mut to_check = vec![];

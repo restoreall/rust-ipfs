@@ -70,6 +70,10 @@ pub struct Message {
     want: HashMap<Cid, Priority>,
     /// List of blocks to cancel.
     cancel: HashSet<Cid>,
+    /// List of blocks which peer has
+    haves: HashSet<Cid>,
+    /// List of blocks which peer has not
+    dont_haves: HashSet<Cid>,
     /// Whether it is the full list of wanted blocks.
     full: bool,
     /// List of blocks to send.
@@ -112,6 +116,26 @@ impl Message {
     /// Returns the list of cancelled blocks.
     pub fn cancel(&self) -> &HashSet<Cid> {
         &self.cancel
+    }
+
+    /// Returns the list of blocks which have
+    pub fn have(&self) -> &HashSet<Cid> {
+        &self.haves
+    }
+
+    /// Returns the list of blocks which don't have
+    pub fn dont_have(&self) -> &HashSet<Cid> {
+        &self.dont_haves
+    }
+
+    /// Adds a block to the have list.
+    pub fn have_block(&mut self, cid: &Cid) {
+        self.haves.insert(cid.to_owned());
+    }
+
+    /// Adds a block to the don't have list.
+    pub fn dont_have_block(&mut self, cid: &Cid) {
+        self.dont_haves.insert(cid.to_owned());
     }
 
     /// Adds a `Block` to the message.
@@ -208,6 +232,22 @@ impl TryFrom<&[u8]> for Message {
                 message.cancel_block(&cid);
             } else {
                 message.want_block(&cid, entry.priority);
+            }
+        }
+        // block presences had added into bitswap proto when 2020.1
+        // But it still doesn't work now in go-ipfs v0.7
+        for bp in proto.block_presences {
+            let cid = Cid::try_from(bp.cid)?;
+            let msg_type = bitswap_pb::message::BlockPresenceType::from_i32(bp.r#type)
+                .ok_or_else(|| BitswapError::InvalidData)?;
+
+            match msg_type {
+                bitswap_pb::message::BlockPresenceType::Have => {
+                    message.have_block(&cid);
+                }
+                bitswap_pb::message::BlockPresenceType::DontHave => {
+                    message.dont_have_block(&cid);
+                }
             }
         }
         for payload in proto.payload {
