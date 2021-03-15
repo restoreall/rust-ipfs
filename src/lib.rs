@@ -1070,6 +1070,18 @@ mod node {
             Self::with_options(opts).await
         }
 
+        /// Initialises a new `Node` with an in-memory store backed configuration.
+        ///
+        /// This method only used in unit test that connect to go-ipfs.
+        /// Because go-test just supports `/ipfs/lan/kad/1.0.0`.
+        #[allow(dead_code)]
+        pub async fn test_new<T: AsRef<str>>(name: T) -> Self {
+            let mut opts = IpfsOptions::inmemory_with_generated_keys();
+            opts.kad_protocol = Some("/ipfs/lan/kad/1.0.0".to_owned());
+            opts.span = Some(trace_span!("ipfs", node = name.as_ref()));
+            Self::with_options(opts).await
+        }
+
         /// Connects to a peer at the given address.
         pub async fn connect(&self, addr: Multiaddr) -> Result<(), Error> {
             let addr = MultiaddrWithPeerId::try_from(addr).unwrap();

@@ -8,6 +8,9 @@ use std::{convert::TryInto, time::Duration};
 
 mod common;
 use common::{interop::ForeignNode, spawn_nodes, Topology};
+use log::LevelFilter;
+
+use env_logger;
 
 fn strip_peer_id(addr: Multiaddr) -> Multiaddr {
     let MultiaddrWithPeerId { multiaddr, .. } = addr.try_into().unwrap();
@@ -89,6 +92,8 @@ async fn spawn_bootstrapped_nodes(n: usize) -> (Vec<Node>, Option<ForeignNode>) 
             (nodes[i - 1].id, nodes[i - 1].addrs[0].clone())
         };
 
+        println!("{}.next id is {} & addr is {}", i, next_id, next_addr);
+
         nodes[i].add_peer(next_id, next_addr).await;
         nodes[i].bootstrap().await.unwrap();
     }
@@ -103,6 +108,8 @@ async fn spawn_bootstrapped_nodes(n: usize) -> (Vec<Node>, Option<ForeignNode>) 
 /// Check if `Ipfs::find_peer` works using DHT.
 #[tokio::test]
 async fn dht_find_peer() {
+    // env_logger::builder().filter_level(LevelFilter::Debug).init();
+
     // works for numbers >=2, though 2 would essentially just
     // be the same as find_peer_local, so it should be higher
     const CHAIN_LEN: usize = 10;
@@ -120,30 +127,14 @@ async fn dht_find_peer() {
 
 #[tokio::test]
 async fn dht_get_closest_peers() {
-    const CHAIN_LEN: usize = 10;
+    env_logger::builder().filter_level(LevelFilter::Debug).init();
+    const CHAIN_LEN: usize = 4;
     let (nodes, _foreign_node) = spawn_bootstrapped_nodes(CHAIN_LEN).await;
 
     assert_eq!(
         nodes[0].get_closest_peers(nodes[0].id).await.unwrap().len(),
         CHAIN_LEN - 1
     );
-}
-
-#[ignore = "targets an actual bootstrapper, so random failures can happen"]
-#[tokio::test]
-async fn dht_popular_content_discovery() {
-    let peer = Node::new("a").await;
-
-    peer.restore_bootstrappers().await.unwrap();
-
-    // the Cid of the IPFS logo
-    let cid: Cid = "bafkreicncneocapbypwwe3gl47bzvr3pkpxmmobzn7zr2iaz67df4kjeiq"
-        .parse()
-        .unwrap();
-
-    assert!(timeout(Duration::from_secs(10), peer.get_block(&cid))
-        .await
-        .is_ok());
 }
 
 /// Check if Ipfs::{get_providers, provide} does its job.

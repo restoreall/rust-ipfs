@@ -23,7 +23,10 @@ pub async fn spawn_nodes(count: usize, topology: Topology) -> Vec<Node> {
     let mut nodes = Vec::with_capacity(count);
 
     for i in 0..count {
+        #[cfg(not(feature = "test_go_interop"))]
         let node = Node::new(i.to_string()).await;
+        #[cfg(feature = "test_go_interop")]
+        let node = Node::test_new(i.to_string()).await;
         nodes.push(node);
     }
 
