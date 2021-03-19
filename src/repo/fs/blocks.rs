@@ -261,6 +261,7 @@ impl BlockStore for FsBlockStore {
             drop(cleanup);
 
             match je {
+                // Write block finished
                 Ok(Ok(Ok(written))) => {
                     trace!(bytes = written, "block writing succeeded");
                     let _ = tx
@@ -275,6 +276,7 @@ impl BlockStore for FsBlockStore {
 
                     Ok((cid, BlockPut::NewBlock))
                 }
+                // Write block failed but try to remove file
                 Ok(Ok(Err(e))) => {
                     trace!("write failed but hopefully the target was removed");
                     let _ = tx
@@ -296,10 +298,12 @@ impl BlockStore for FsBlockStore {
                     drop(tx);
 
                     let message = match rx.recv().await {
+                        // Other thread send message
                         Ok(message) => {
                             trace!("synchronized with writer, write outcome: {:?}", message);
                             message
                         }
+                        // No sender now
                         Err(broadcast::error::RecvError::Closed) => {
                             // there was never any write intention by any party, and we may have just
                             // closed the last sender above, or we were late for the one message.
