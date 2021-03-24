@@ -5,7 +5,7 @@ mod cli_unixfs;
 mod cli_bitswap;
 pub(crate) use cli_bitswap::bitswap_cli_commands;
 
-use crate::{Ipfs, TestTypes};
+use crate::{Ipfs, TestTypes, Types};
 use libp2p_rs::xcli::*;
 
 const IPFS: &str = "ipfs";
@@ -21,10 +21,10 @@ pub(crate) fn ipfs_cli_commands<'a>() -> Command<'a> {
         .subcommand(cli_dag::cli_dag_commands())
 }
 
-pub(crate) fn handler(app: &App) -> Ipfs<TestTypes> {
+pub(crate) fn handler(app: &App) -> Ipfs<Types> {
     let value_any = app.get_handler(IPFS).expect(IPFS);
     let ipfs = value_any
-        .downcast_ref::<Ipfs<TestTypes>>()
+        .downcast_ref::<Ipfs<Types>>()
         .expect("ipfs")
         .clone();
     ipfs

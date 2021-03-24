@@ -148,7 +148,7 @@ impl Controls {
         let floodsub_control = floodsub.control();
 
         // register floodsub into Swarm
-        swarm = swarm.with_protocol(floodsub);
+        // swarm = swarm.with_protocol(floodsub);
 
         // bitswap
         let bitswap = Bitswap::new(repo, kad_control.clone());

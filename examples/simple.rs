@@ -1,4 +1,4 @@
-use ipfs::{Ipfs, IpfsOptions, TestTypes, UninitializedIpfs};
+use ipfs::{Ipfs, IpfsOptions, TestTypes, UninitializedIpfs, Types};
 use libp2p_rs::runtime::task;
 
 fn main() {
@@ -9,7 +9,7 @@ fn main() {
             .init();
 
         // Initialize the repo and start a daemon
-        let mut opts = IpfsOptions::inmemory_with_generated_keys();
+        let mut opts = IpfsOptions::disk_with_generated_keys();
 
         opts.listening_addrs
             .push("/ip4/0.0.0.0/tcp/8084".parse().unwrap());
@@ -21,7 +21,7 @@ fn main() {
             "/ip4/127.0.0.1/tcp/4001".parse().unwrap(),
         ));
 
-        let ipfs: Ipfs<TestTypes> = UninitializedIpfs::new(opts).start().await.unwrap();
+        let ipfs: Ipfs<Types> = UninitializedIpfs::new(opts).start().await.unwrap();
 
         let addrs = ipfs.identity().await.unwrap().1;
         println!("I am listening on {:?}", addrs);

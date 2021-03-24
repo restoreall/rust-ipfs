@@ -17,6 +17,11 @@ use std::collections::BTreeSet;
 use std::convert::Infallible;
 use std::path::PathBuf;
 use std::str::{self, FromStr};
+use std::sync::Mutex;
+use std::sync::Arc;
+use tokio::sync::broadcast::Sender;
+use std::collections::HashMap;
+use tokio::sync::RwLock;
 
 /// [`sled`] based pinstore implementation. Implements datastore which errors for each call.
 /// Currently feature-gated behind `sled_data_store` feature in the [`crate::Types`], usable
@@ -68,22 +73,95 @@ impl DataStore for KvDataStore {
     }
 
     /// Checks if a key is present in the datastore.
-    async fn contains(&self, _col: Column, _key: &[u8]) -> Result<bool, Error> {
-        Err(anyhow::anyhow!("not implemented"))
+    async fn contains(&self, col: Column, key: &[u8]) -> Result<bool, Error> {
+        let result = tokio::task::spawn_blocking(|| {
+            let db = self.db.get().unwrap();
+            let s = format!("{:?}", col);
+            let result = db.open_tree(s).map_err(|e| e.into()).unwrap();
+            result.contains_key(key)
+        }).await;
+
+        return match result {
+            Ok(value) => {
+                value.map_err(|e| e.into())
+            }
+            Err(e) if e.is_cancelled() => {
+                trace!("runtime is shutting down: {}", e);
+                Err(e.into())
+            }
+            Err(e) => {
+                // as of writing this, we didn't have panicking inside the task
+                error!("blocking put task panicked or something else: {}", e);
+                Err(e.into())
+            }
+        };
+        // Err(anyhow::anyhow!("not implemented"))
     }
 
     /// Returns the value associated with a key from the datastore.
-    async fn get(&self, _col: Column, _key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
-        Err(anyhow::anyhow!("not implemented"))
+    async fn get(&self, col: Column, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+        let result = tokio::task::spawn_blocking(|| {
+            let db = self.db.get().unwrap();
+            let s = format!("{:?}", col);
+            let result = db.open_tree(s).map_err(|e| e.into()).unwrap();
+            return match result.get(key) {
+                Ok(result) => {
+                    Ok(result.map(|item| item.to_vec()))
+                }
+                Err(e) => {
+                    Err(e)
+                }
+            };
+        }).await;
+
+        match result {
+            Ok(value) => {
+                value.map_err(|e| e.into())
+            }
+            Err(e) if e.is_cancelled() => {
+                trace!("runtime is shutting down: {}", e);
+                return Err(e.into());
+            }
+            Err(e) => {
+                // as of writing this, we didn't have panicking inside the task
+                error!("blocking put task panicked or something else: {}", e);
+                return Err(e.into());
+            }
+        }
     }
 
     /// Puts the value under the key in the datastore.
-    async fn put(&self, _col: Column, _key: &[u8], _value: &[u8]) -> Result<(), Error> {
-        Err(anyhow::anyhow!("not implemented"))
+    async fn put(&self, col: Column, key: &[u8], value: &[u8]) -> Result<(), Error> {
+        let u = tokio::task::spawn_blocking(move || {
+            let db = self.db.get().unwrap();
+            let s = format!("{:?}", col);
+            let tree = db.open_tree(s).map_err(|e| e.into()).unwrap();
+            tree.insert(key, value).map_err(|e| e.into())?
+        }).await;
+
+        match u {
+            Ok(Some(data)) => {
+                drop(data);
+            }
+            Err(e) if e.is_cancelled() => {
+                trace!("runtime is shutting down: {}", e);
+                return Err(e.into());
+            }
+            Err(e) => {
+                // as of writing this, we didn't have panicking inside the task
+                error!("blocking put task panicked or something else: {}", e);
+                return Err(e.into());
+            }
+            _ => {}
+        }
+        Ok(())
     }
 
     /// Removes a key-value pair from the datastore.
     async fn remove(&self, _col: Column, _key: &[u8]) -> Result<(), Error> {
+        // tokio::task::spawn_blocking(|| {
+        //     let db = self.db.get();
+        // }).await;
         Err(anyhow::anyhow!("not implemented"))
     }
 
@@ -109,7 +187,7 @@ impl PinStore for KvDataStore {
                 Ok(get_pinned_mode(tree, &cid)?.is_some())
             })?)
         })
-        .await?
+            .await?
     }
 
     async fn insert_direct_pin(&self, target: &Cid) -> Result<(), Error> {
@@ -129,7 +207,7 @@ impl PinStore for KvDataStore {
                 match already_pinned {
                     Some((PinMode::Direct, _)) => return Ok(()),
                     Some((PinMode::Recursive, _)) => {
-                        return Err(Abort(anyhow::anyhow!("already pinned recursively")))
+                        return Err(Abort(anyhow::anyhow!("already pinned recursively")));
                     }
                     Some((PinMode::Indirect, key)) => {
                         // TODO: I think the direct should live alongside the indirect?
@@ -146,7 +224,7 @@ impl PinStore for KvDataStore {
                 Ok(())
             })
         })
-        .await?;
+            .await?;
 
         launder(res)
     }
@@ -206,7 +284,7 @@ impl PinStore for KvDataStore {
                 Ok(())
             })
         })
-        .await??;
+            .await??;
 
         Ok(())
     }
@@ -233,7 +311,7 @@ impl PinStore for KvDataStore {
                 Ok(())
             })
         })
-        .await?;
+            .await?;
 
         launder(res)
     }
@@ -282,7 +360,7 @@ impl PinStore for KvDataStore {
                 Ok(())
             })
         })
-        .await?;
+            .await?;
 
         launder(res)
     }
@@ -338,7 +416,7 @@ impl PinStore for KvDataStore {
                                     return Some(Err(anyhow::anyhow!(
                                         "invalid pinmode: {}",
                                         x as char
-                                    )))
+                                    )));
                                 }
                             };
 
@@ -440,7 +518,7 @@ impl PinStore for KvDataStore {
                 .filter_map(|(cid, mode)| mode.map(move |mode| (cid, mode)))
                 .collect::<Vec<_>>())
         })
-        .await?
+            .await?
     }
 }
 

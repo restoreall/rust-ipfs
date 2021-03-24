@@ -88,6 +88,11 @@ pub enum BlockRmError {
     NotFound(Cid),
 }
 
+pub enum SledError{
+    NotFound(Vec<u8>)
+
+}
+
 /// This API is being discussed and evolved, which will likely lead to breakage.
 // FIXME: why is this unpin? doesn't probably need to be since all of the futures are Box::pin'd.
 #[async_trait]
@@ -220,6 +225,8 @@ pub trait PinStore: Debug + Send + Sync + Unpin + 'static {
 #[derive(Clone, Copy, Debug)]
 pub enum Column {
     Ipns,
+    Providers,
+    Blocks,
 }
 
 /// `PinMode` is the description of pin type for quering purposes.

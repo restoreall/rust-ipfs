@@ -21,7 +21,7 @@ log = "0.4"
 prost = { version = "0.7", features = ["std"], default-features = false }
 thiserror = "1.0"
 #libp2p-rs = { default-features = true, path = "../../../../libp2p-rs" }
-libp2p-rs = { git = "https://github.com/kingwel-xie/libp2p-rs.git", branch = "master", default-features = true }
+libp2p-rs = { path = "../../libp2p-rs", features = ["tokio"] }
 
 [build-dependencies]
 prost-build = "0.7"
